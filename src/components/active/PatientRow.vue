@@ -45,7 +45,7 @@ const appointmentText = computed(() => {
     <td>
       <InrStatusBadge :inr-value="summary.latestInr?.value" :target-low="summary.patient.targetInrLow" :target-high="summary.patient.targetInrHigh" :days-since-last-inr="inrDays" />
     </td>
-    <td>{{ summary.currentDoseMgday !== null && summary.currentDoseMgday !== undefined ? `${summary.currentDoseMgday.toFixed(1)} mg/วัน` : '-' }}</td>
+    <td>{{ summary.currentDoseMgday !== null && summary.currentDoseMgday !== undefined ? `${(summary.currentDoseMgday * 7).toFixed(1)} mg/สัปดาห์` : '-' }}</td>
     <td><TtrBadge :ttr="summary.ttr6months" /></td>
     <td>{{ appointmentText }}</td>
     <td><AlertBadge :alerts="alerts ?? []" /></td>
