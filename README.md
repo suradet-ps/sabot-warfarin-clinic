@@ -1,9 +1,14 @@
 # Warfarin Clinic Management System
 
-[![Tauri v2](https://img.shields.io/badge/Tauri-2.10-blue?style=flat&logo=tauri)](https://tauri.app)
-[![Vue 3](https://img.shields.io/badge/Vue-3.5-green?style=flat&logo=vue.js)](https://vuejs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat&logo=typescript)](https://www.typescriptlang.org)
+[![Tauri v2](https://img.shields.io/badge/Tauri-2-blue?style=flat&logo=tauri)](https://tauri.app)
+[![Vue v3](https://img.shields.io/badge/Vue-3-green?style=flat&logo=vue.js)](https://vuejs.org)
+[![TypeScript v6](https://img.shields.io/badge/TypeScript-v6-blue?style=flat&logo=typescript)](https://www.typescriptlang.org)
 [![Rust](https://img.shields.io/badge/Rust-stable-orange?style=flat&logo=rust)](https://www.rust-lang.org)
+[![npm v8](https://img.shields.io/badge/npm-8-blue?style=flat&logo=npm)](https://www.npmjs.com)
+[![Vite v8](https://img.shields.io/badge/Vite-8-blue?style=flat&logo=vite)](https://vitejs.dev)
+[![Pinia v3](https://img.shields.io/badge/Pinia-v3-green)](https://pinia.vuejs.org)
+[![Lucide Icons](https://img.shields.io/badge/Lucide-Icons-blue)](https://lucide.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A desktop application for managing a warfarin anticoagulation clinic at Sabot Hospital. Built with Tauri 2.10 (Rust) + Vue 3.5 (TypeScript), bridging HOSxP's MySQL database (read-only) with a local SQLite database for clinic-specific tracking.
 
