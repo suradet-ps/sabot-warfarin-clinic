@@ -1,9 +1,9 @@
 [package]
 name = "sabot-warfarin-clinic"
 version = "0.1.0"
-description = "Warfarin Clinic Management System — Sarabosot Hospital"
-authors = ["Sarabosot Hospital"]
-edition = "2021"
+description = "Warfarin Clinic Management System — Sabot Hospital"
+authors = ["Suradet Pratomsak"]
+edition = "2024"
 
 [lib]
 name = "sabot_warfarin_clinic_lib"
