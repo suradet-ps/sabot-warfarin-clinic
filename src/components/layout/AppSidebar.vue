@@ -25,7 +25,7 @@ onMounted(() => {
 
 <template>
   <nav class="sidebar">
-    <div class="sidebar-logo"><svg class="sidebar-logo-icon" width="24" height="24" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <div class="sidebar-logo"><svg class="sidebar-logo-icon" width="40" height="40" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
     <defs>
       <filter id="shadow_bold_full" x="-20%" y="-20%" width="140%" height="140%">
         <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#831843" flood-opacity="0.3"/>
@@ -50,7 +50,7 @@ onMounted(() => {
 <style scoped>
 .sidebar { width: 15rem; min-width: 15rem; background: var(--color-primary); display: flex; flex-direction: column; padding: var(--spacing-xl) 0; }
 .sidebar-logo { display: flex; align-items: center; gap: var(--spacing-sm); padding: 0 var(--spacing-xl) var(--spacing-xxl); }
-.sidebar-logo-icon { color: var(--color-brand-coral); }
+.sidebar-logo-icon { color: var(--color-brand-coral); width: 40px; height: 40px; flex-shrink: 0; }
 .sidebar-logo-text { display: flex; flex-direction: column; }
 .sidebar-logo-title { font-size: var(--typography-heading-5-size); font-weight: var(--typography-heading-5-weight); color: var(--color-on-dark); }
 .sidebar-logo-sub,.footer-text { color: var(--color-on-dark-muted); }
