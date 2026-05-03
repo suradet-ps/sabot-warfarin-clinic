@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useRouter } from 'vue-router'
-import { AlertTriangle, FilePenLine, Users } from 'lucide-vue-next'
+import { AlertTriangle, Search, Users } from 'lucide-vue-next'
 import PatientRow from '#/components/active/PatientRow.vue'
 import VisitFormPanel from '#/components/visit/VisitFormPanel.vue'
 import { useAlertStore } from '#/stores/alerts'
@@ -15,8 +15,20 @@ const selectedHn = ref<string>('')
 const summaries = ref<ActivePatientSummary[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const searchQuery = ref('')
 
 const criticalAlerts = computed(() => alertStore.alerts.filter((a) => a.severity === 'critical'))
+
+const filteredSummaries = computed(() => {
+  if (!searchQuery.value.trim()) return summaries.value
+  const query = searchQuery.value.toLowerCase()
+  return summaries.value.filter((s) => {
+    const hn = s.patient.hn.toLowerCase()
+    const fname = s.hosxpInfo?.fname?.toLowerCase() ?? ''
+    const lname = s.hosxpInfo?.lname?.toLowerCase() ?? ''
+    return hn.includes(query) || fname.includes(query) || lname.includes(query)
+  })
+})
 
 async function loadRows() {
   loading.value = true
@@ -66,12 +78,18 @@ onMounted(() => {
       <div class="stat-row">
         <div class="stat-chip card">
           <Users :size="16" class="stat-icon" />
-          <span class="body-sm">ผู้ป่วย <strong>{{ summaries.length }}</strong> ราย</span>
+          <span class="body-sm">ผู้ป่วย <strong>{{ filteredSummaries.length }}</strong> ราย</span>
         </div>
       </div>
-      <button class="btn btn-primary" :disabled="!summaries.length" @click="openVisit(selectedHn || summaries[0]?.patient.hn || '')">
-        <FilePenLine :size="16" /> บันทึกการเยี่ยม
-      </button>
+      <div class="search-box">
+        <Search :size="16" class="search-icon" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="ค้นหา HN, ชื่อ, สกุล"
+          class="search-input"
+        />
+      </div>
     </div>
 
     <div v-if="loading" class="card loading-state body-sm">กำลังโหลด...</div>
@@ -90,11 +108,11 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="summaries.length === 0">
-            <td colspan="7" class="empty-cell">ยังไม่มีผู้ป่วยในคลินิก</td>
+          <tr v-if="filteredSummaries.length === 0">
+            <td colspan="7" class="empty-cell">{{ searchQuery ? 'ไม่พบผู้ป่วยที่ค้นหา' : 'ยังไม่มีผู้ป่วยในคลินิก' }}</td>
           </tr>
           <PatientRow
-            v-for="summary in summaries"
+            v-for="summary in filteredSummaries"
             :key="summary.patient.hn"
             :summary="summary"
             :alerts="alertStore.getAlertsForPatient(summary.patient.hn)"
@@ -124,6 +142,10 @@ onMounted(() => {
 .stat-row { display: flex; gap: var(--spacing-md); }
 .stat-chip { display: flex; align-items: center; gap: var(--spacing-xs); }
 .stat-icon { color: var(--color-slate); }
+.search-box { display: flex; align-items: center; gap: var(--spacing-xs); background: var(--color-canvas); border: 1px solid var(--color-hairline-soft); border-radius: var(--rounded-md); padding: var(--spacing-sm) var(--spacing-md); }
+.search-icon { color: var(--color-stone); flex-shrink: 0; }
+.search-input { border: none; outline: none; background: transparent; font-size: var(--typography-body-sm-size); color: var(--color-ink); width: 200px; }
+.search-input::placeholder { color: var(--color-stone); }
 .loading-state, .empty-cell {
   padding: var(--spacing-xxl);
   text-align: center;
