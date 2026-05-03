@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { BarChart3, Heart, Search, Settings, Users } from 'lucide-vue-next'
+import { BarChart3, Search, Settings, Users } from 'lucide-vue-next'
 import { useAlertStore } from '#/stores/alerts'
 import { useSettingsStore } from '#/stores/settings'
 
@@ -25,7 +25,21 @@ onMounted(() => {
 
 <template>
   <nav class="sidebar">
-    <div class="sidebar-logo"><Heart :size="24" class="sidebar-logo-icon" /><div class="sidebar-logo-text"><span class="sidebar-logo-title">วาร์ฟาริน</span><span class="sidebar-logo-sub">คลินิก</span></div></div>
+    <div class="sidebar-logo"><svg class="sidebar-logo-icon" width="24" height="24" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="shadow_bold_full" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#831843" flood-opacity="0.3"/>
+      </filter>
+    </defs>
+    
+    <g filter="url(#shadow_bold_full)" stroke="#EC4899" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M100 185C100 185 185 130 185 80C185 45 155 25 125 25C108 25 100 38 100 38C100 38 92 25 75 25C45 25 15 45 15 80C15 130 100 185 100 185Z"/>
+      
+      <path d="M100 160C100 160 160 115 160 80C160 55 142 42 125 42C112 42 100 50 100 50C100 50 88 42 75 42C58 42 40 55 40 80C40 115 100 160 100 160Z" opacity="0.6"/>
+      
+      <path d="M100 135C100 135 135 105 135 80C135 68 128 60 120 60C110 60 100 68 100 68C100 68 90 60 80 60C72 60 65 68 65 80C65 105 100 135 100 135Z" opacity="0.3"/>
+    </g>
+  </svg><div class="sidebar-logo-text"><span class="sidebar-logo-title">วาร์ฟาริน</span><span class="sidebar-logo-sub">คลินิก</span></div></div>
     <ul class="sidebar-nav">
       <li v-for="item in navItems" :key="item.name"><RouterLink :to="item.path" class="sidebar-nav-item" :class="{ active: route.path.startsWith(item.path) }"><component :is="item.icon" :size="20" /><span>{{ item.label }}</span><span v-if="item.name === 'active' && totalAlerts > 0" class="sidebar-badge">{{ totalAlerts }}</span></RouterLink></li>
     </ul>

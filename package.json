@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "type-check": "vue-tsc --noEmit",
     "fmt": "cd src-tauri && cargo fmt",
-    "fmt:check": "cd src-tauri && cargo fmt -- --check"
+    "fmt:check": "cd src-tauri && cargo fmt -- --check",
+    "gen-icons": "node scripts/gen-icons.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
@@ -22,6 +23,7 @@
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tauri-apps/cli": "^2.11.0",
     "@vitejs/plugin-vue": "^6.0.6",
     "typescript": "^6.0.3",
