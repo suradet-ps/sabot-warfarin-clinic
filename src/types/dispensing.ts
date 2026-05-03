@@ -19,6 +19,7 @@ export interface DispensingRecord {
   qty: number
   unitprice: number
   drugusageCode?: string
+  spUseCode?: string
   usageText?: string
   parsedDose?: ParsedDoseInfo
   usageParseNote?: string

@@ -126,6 +126,72 @@ export function sortDispensing(records: DispensingRecord[]): DispensingRecord[] 
   return [...records].sort((a, b) => `${b.vstdate}`.localeCompare(`${a.vstdate}`))
 }
 
+export function mergeDoseSchedules(...schedules: Array<Partial<DoseSchedule> | string | null | undefined>): DoseSchedule {
+  return schedules.reduce<DoseSchedule>((merged, schedule) => {
+    const normalized = normalizeDoseSchedule(schedule)
+    return {
+      mon: merged.mon + normalized.mon,
+      tue: merged.tue + normalized.tue,
+      wed: merged.wed + normalized.wed,
+      thu: merged.thu + normalized.thu,
+      fri: merged.fri + normalized.fri,
+      sat: merged.sat + normalized.sat,
+      sun: merged.sun + normalized.sun,
+    }
+  }, emptyDoseSchedule())
+}
+
+export interface AggregatedDispensingVisit {
+  visitKey: string
+  hn: string
+  vn?: string
+  vstdate: string
+  items: DispensingRecord[]
+  combinedSchedule: DoseSchedule
+  mgPerWeek: number
+  mgPerDayAverage: number
+  usageTextSummary: string
+  parseNotes: string[]
+}
+
+export function aggregateDispensingByVisit(records: DispensingRecord[]): AggregatedDispensingVisit[] {
+  const visitMap = new Map<string, AggregatedDispensingVisit>()
+
+  for (const record of sortDispensing(records)) {
+    const visitKey = `${record.vstdate}::${record.vn || 'no-vn'}`
+    const existing = visitMap.get(visitKey)
+    if (existing) {
+      existing.items.push(record)
+      existing.combinedSchedule = mergeDoseSchedules(existing.combinedSchedule, record.parsedDose?.schedule)
+      existing.mgPerWeek = scheduleWeeklyTotal(existing.combinedSchedule)
+      existing.mgPerDayAverage = existing.mgPerWeek / doseDayKeys.length
+      if (record.usageText && !existing.usageTextSummary.includes(record.usageText)) {
+        existing.usageTextSummary = `${existing.usageTextSummary} | ${record.usageText}`
+      }
+      if (record.usageParseNote && !existing.parseNotes.includes(record.usageParseNote)) {
+        existing.parseNotes.push(record.usageParseNote)
+      }
+      continue
+    }
+
+    const combinedSchedule = mergeDoseSchedules(record.parsedDose?.schedule)
+    visitMap.set(visitKey, {
+      visitKey,
+      hn: record.hn,
+      vn: record.vn,
+      vstdate: record.vstdate,
+      items: [record],
+      combinedSchedule,
+      mgPerWeek: scheduleWeeklyTotal(combinedSchedule),
+      mgPerDayAverage: scheduleAverageDose(combinedSchedule),
+      usageTextSummary: record.usageText || '-',
+      parseNotes: record.usageParseNote ? [record.usageParseNote] : [],
+    })
+  }
+
+  return [...visitMap.values()].sort((a, b) => `${b.vstdate}::${b.vn || ''}`.localeCompare(`${a.vstdate}::${a.vn || ''}`))
+}
+
 export function latestVisit(visits: WfVisit[]): WfVisit | undefined {
   return [...visits].sort((a, b) => `${b.visitDate}`.localeCompare(`${a.visitDate}`))[0]
 }

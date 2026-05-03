@@ -8,9 +8,11 @@ import type { InrRecord } from '#/types/inr'
 import type { PatientDetail } from '#/types/patient'
 import type { DoseSuggestion, VisitInput, WfVisit } from '#/types/visit'
 import {
+  aggregateDispensingByVisit,
   dateInputToday,
   formatThaiDate,
   emptyDoseSchedule,
+  mergeDoseSchedules,
   normalizeDoseSchedule,
   scheduleAverageDose,
   scheduleWeeklyTotal,
@@ -40,6 +42,7 @@ const suggestion = ref<DoseSuggestion | null>(null)
 const targetLow = ref(2.0)
 const targetHigh = ref(3.0)
 const latestHosxpDispense = ref<DispensingRecord | null>(null)
+const latestHosxpVisit = ref<ReturnType<typeof aggregateDispensingByVisit>[number] | null>(null)
 const currentDoseSource = ref<'visit' | 'hosxp' | 'manual'>('manual')
 const currentDoseSourceText = ref('')
 
@@ -66,14 +69,16 @@ async function loadDefaults() {
       inrSource.value = latestInr.source as typeof inrSource.value ?? 'lab_order'
     }
     const lastVisit = visits[0]
-    latestHosxpDispense.value = patientData.dispensingHistory?.find((record) => !!record.parsedDose) ?? null
+    const aggregatedVisits = aggregateDispensingByVisit(patientData.dispensingHistory ?? [])
+    latestHosxpVisit.value = aggregatedVisits.find((visit) => visit.mgPerWeek > 0) ?? null
+    latestHosxpDispense.value = latestHosxpVisit.value?.items[0] ?? null
     if (lastVisit) {
       currentDoseMgday.value = lastVisit.newDoseMgday ?? lastVisit.currentDoseMgday ?? null
       currentDoseDetail.value = normalizeDoseSchedule(lastVisit.newDoseDetail ?? lastVisit.doseDetail)
       currentDoseSource.value = 'visit'
       currentDoseSourceText.value = 'ใช้ขนาดยาจาก visit ล่าสุดที่บันทึกในคลินิก'
-    } else if (latestHosxpDispense.value?.parsedDose) {
-      applyHosxpDose(latestHosxpDispense.value)
+    } else if (latestHosxpVisit.value) {
+      applyHosxpDose(latestHosxpVisit.value)
     } else {
       currentDoseSource.value = 'manual'
       currentDoseSourceText.value = 'ไม่พบขนาดยาเดิมที่คำนวณได้จากระบบ กรุณากรอกเอง'
@@ -85,12 +90,11 @@ async function loadDefaults() {
   }
 }
 
-function applyHosxpDose(record: DispensingRecord) {
-  if (!record.parsedDose) return
-  currentDoseDetail.value = normalizeDoseSchedule(record.parsedDose.schedule)
-  currentDoseMgday.value = record.parsedDose.mgPerDayAverage
+function applyHosxpDose(visit: NonNullable<typeof latestHosxpVisit.value>) {
+  currentDoseDetail.value = mergeDoseSchedules(visit.combinedSchedule)
+  currentDoseMgday.value = visit.mgPerDayAverage
   currentDoseSource.value = 'hosxp'
-  currentDoseSourceText.value = `ดึงจาก HosXP วันที่ ${formatThaiDate(record.vstdate)}${record.usageText ? `: ${record.usageText}` : ''}`
+  currentDoseSourceText.value = `ดึงจาก HosXP วันที่ ${formatThaiDate(visit.vstdate)}${visit.usageTextSummary !== '-' ? `: ${visit.usageTextSummary}` : ''}`
 }
 
 async function fetchSuggestion() {
@@ -201,17 +205,17 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
                 <p class="caption dose-source-text">{{ currentDoseSourceText }}</p>
               </div>
               <button
-                v-if="latestHosxpDispense?.parsedDose && currentDoseSource !== 'hosxp'"
+                v-if="latestHosxpVisit && currentDoseSource !== 'hosxp'"
                 type="button"
                 class="btn btn-secondary btn-compact"
-                @click="applyHosxpDose(latestHosxpDispense)"
+                @click="applyHosxpDose(latestHosxpVisit)"
               >
                 ใช้ค่าจาก HosXP ล่าสุด
               </button>
             </div>
             <DayDoseTable v-model="currentDoseDetail" />
             <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ currentDoseAvg.toFixed(2) }} mg/วัน | รวม {{ currentDoseWeek.toFixed(1) }} mg/week</p>
-            <p v-if="latestHosxpDispense?.usageParseNote" class="caption dose-warning">{{ latestHosxpDispense.usageParseNote }}</p>
+            <p v-if="latestHosxpVisit?.parseNotes.length" class="caption dose-warning">{{ latestHosxpVisit.parseNotes.join(' | ') }}</p>
           </div>
 
           <div class="suggestion-row">

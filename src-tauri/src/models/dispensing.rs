@@ -25,6 +25,7 @@ pub struct DispensingRecord {
   pub qty: f64,
   pub unitprice: f64,
   pub drugusage_code: Option<String>,
+  pub sp_use_code: Option<String>,
   pub usage_text: Option<String>,
   pub parsed_dose: Option<ParsedDoseInfo>,
   pub usage_parse_note: Option<String>,

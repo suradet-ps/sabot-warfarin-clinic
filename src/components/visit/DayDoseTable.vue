@@ -34,7 +34,7 @@ const totalMgDay = computed(() => scheduleAverageDose(model.value))
 
 .dose-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: var(--spacing-xs);
 }
 
@@ -56,15 +56,28 @@ const totalMgDay = computed(() => scheduleAverageDose(model.value))
 .dose-input,
 .dose-value {
   text-align: center;
+  color: var(--color-ink);
+  font-weight: var(--typography-body-sm-medium-weight);
+  font-size: var(--typography-body-sm-medium-size);
 }
 
 .dose-value {
   padding: var(--spacing-sm) 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dose-total {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+@media (max-width: 640px) {
+  .dose-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 </style>

@@ -559,10 +559,21 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
             CAST(o.qty AS DOUBLE)          AS qty,
             CAST(o.unitprice AS DOUBLE)    AS unitprice,
             CAST(o.drugusage AS CHAR)      AS drugusage_code,
-            NULLIF(TRIM(CONCAT_WS(' ', du.name1, du.name2, du.name3)), '') AS usage_text
+            CAST(o.sp_use AS CHAR)         AS sp_use_code,
+            NULLIF(
+              TRIM(
+                CONCAT_WS(
+                  ' ',
+                  NULLIF(TRIM(CONCAT_WS(' ', du.name1, du.name2, du.name3, du.shortlist)), ''),
+                  NULLIF(TRIM(CONCAT_WS(' ', su.name1, su.name2, su.name3)), '')
+                )
+              ),
+              ''
+            ) AS usage_text
         FROM opitemrece o
         LEFT JOIN drugitems d ON d.icode = o.icode
         LEFT JOIN drugusage du ON du.drugusage = o.drugusage
+        LEFT JOIN sp_use su ON su.sp_use = o.sp_use
         WHERE o.hn = ?
           AND o.icode IN ('1600014', '1600013', '1600024')
         ORDER BY o.vstdate DESC, o.vn DESC, o.icode
@@ -586,6 +597,7 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
             CAST(o.qty AS DOUBLE)          AS qty,
             CAST(o.unitprice AS DOUBLE)    AS unitprice,
             NULL                           AS drugusage_code,
+            NULL                           AS sp_use_code,
             NULL                           AS usage_text
         FROM opitemrece o
         LEFT JOIN drugitems d ON d.icode = o.icode
@@ -623,6 +635,7 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
           qty: r.try_get("qty").unwrap_or(0.0),
           unitprice: r.try_get("unitprice").unwrap_or(0.0),
           drugusage_code: get_optional_string(r, "drugusage_code"),
+          sp_use_code: get_optional_string(r, "sp_use_code"),
           usage_text,
           parsed_dose: parsed_usage.as_ref().and_then(|value| value.dose.clone()),
           usage_parse_note: parsed_usage.and_then(|value| value.note),
