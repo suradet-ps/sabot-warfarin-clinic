@@ -163,8 +163,8 @@ function getPillLabel(pill: { mg: number; count: number; is_half: boolean }): st
 
 .option-selected {
   border-color: var(--color-success-accent);
-  background: var(--color-success-accent);
-  background: linear-gradient(to bottom, var(--color-success-accent), color-mix(in srgb, var(--color-success-accent) 90%, white));
+  background: #ecfdf5;
+  box-shadow: 0 0 0 2px var(--color-success-accent);
 }
 
 .option-header {
@@ -182,12 +182,13 @@ function getPillLabel(pill: { mg: number; count: number; is_half: boolean }): st
 }
 
 .check-icon {
-  color: var(--color-success-accent);
+  color: #059669;
 }
 
 .option-label {
   font-weight: 600;
   font-size: var(--typography-caption-bold-size);
+  color: #065f46;
 }
 
 .option-description {

@@ -18,8 +18,10 @@
     "types": [
       "vite/client"
     ],
-    "paths": {
-      "#/*": ["./src/*"]
+"paths": {
+      "#/*": ["./src/*"],
+      "@/*": ["./src/*"],
+      "warfarin_logic": ["./src/warfarin_logic/pkg/warfarin_logic.d.ts"]
     }
   },
   "include": [

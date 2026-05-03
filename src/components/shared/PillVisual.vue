@@ -48,14 +48,26 @@ defineProps<{
 }
 
 .pill-2 {
-  background: var(--color-brand-orange-light);
+  background: #fed7aa;
+}
+
+.pill-2 .pill-text {
+  color: #9a3412;
 }
 
 .pill-3 {
-  background: var(--color-brand-teal);
+  background: #bae6fd;
+}
+
+.pill-3 .pill-text {
+  color: #0369a1;
 }
 
 .pill-5 {
-  background: var(--color-brand-rose);
+  background: #fbcfe8;
+}
+
+.pill-5 .pill-text {
+  color: #be185d;
 }
 </style>
