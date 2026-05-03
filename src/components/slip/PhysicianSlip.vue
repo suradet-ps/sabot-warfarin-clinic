@@ -251,19 +251,19 @@ function ttrClass(v: number | null): string {
           <tr>
             <th></th>
             <th v-for="k in doseDayKeys" :key="k">{{ doseDayLabels[k] }}</th>
-            <th>เฉลี่ย/วัน</th>
+            <th>รวม/สัปดาห์</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td class="dose-label">ยาเดิม</td>
             <td v-for="k in doseDayKeys" :key="k">{{ currentDoseSchedule[k] || '-' }}</td>
-            <td>{{ scheduleAverageDose(currentDoseSchedule).toFixed(1) }} mg</td>
+            <td>{{ scheduleWeeklyTotal(currentDoseSchedule).toFixed(1) }} mg</td>
           </tr>
           <tr class="new-dose-row">
             <td class="dose-label">ยาใหม่</td>
             <td v-for="k in doseDayKeys" :key="k">{{ newDoseSchedule[k] || '-' }}</td>
-            <td>{{ scheduleAverageDose(newDoseSchedule).toFixed(1) }} mg</td>
+            <td>{{ scheduleWeeklyTotal(newDoseSchedule).toFixed(1) }} mg</td>
           </tr>
         </tbody>
       </table>
