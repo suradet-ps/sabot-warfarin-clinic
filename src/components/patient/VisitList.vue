@@ -35,7 +35,7 @@ function adherenceBadgeClass(a?: string | null) {
 
 <template>
   <div class="visit-list">
-    <div v-if="visits.length === 0" class="body-sm" style="color: var(--color-stone)">ยังไม่มีบันทึกการเยี่ยม</div>
+    <div v-if="visits.length === 0" class="body-sm" style="color: var(--color-stone)">ยังไม่มีบันทึกการทำคลินิก</div>
     <div v-for="v in sortedVisits" :key="v.id" class="visit-item card">
       <div class="visit-header" @click="toggleExpand(v.id)">
         <div class="visit-meta">

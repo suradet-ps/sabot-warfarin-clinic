@@ -25,7 +25,7 @@ type TabKey = 'inr' | 'visits' | 'dispensing' | 'appointments' | 'adverse'
 const activeTab = ref<TabKey>('inr')
 const tabs: { key: TabKey; label: string; icon: unknown }[] = [
   { key: 'inr', label: 'INR', icon: Activity },
-  { key: 'visits', label: 'ประวัติการเยี่ยม', icon: FileClock },
+  { key: 'visits', label: 'ประวัติการทำคลินิก', icon: FileClock },
   { key: 'dispensing', label: 'ประวัติยา', icon: Pill },
   { key: 'appointments', label: 'นัดหมาย', icon: CalendarDays },
   { key: 'adverse', label: 'เหตุการณ์', icon: ShieldAlert },
@@ -122,7 +122,7 @@ onMounted(() => { void loadPatient() })
             เปลี่ยนสถานะ
           </button>
           <button type="button" class="btn btn-primary" @click="visitPanelOpen = true">
-            <FilePenLine :size="16" /> + บันทึกการเยี่ยม
+            <FilePenLine :size="16" /> + บันทึกการทำคลินิก
           </button>
         </div>
       </section>

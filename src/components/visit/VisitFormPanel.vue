@@ -238,7 +238,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
     <div v-if="modelValue" class="panel-overlay" @click.self="modelValue = false">
       <div class="visit-panel card">
         <div class="panel-header">
-          <h3 class="h4">บันทึกการเยี่ยม</h3>
+          <h3 class="h4">บันทึกการทำคลินิก</h3>
           <button class="btn btn-ghost" @click="modelValue = false"><X :size="18" /></button>
         </div>
 
