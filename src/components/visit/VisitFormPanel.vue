@@ -291,7 +291,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
   display: flex; align-items: stretch; justify-content: flex-end;
 }
 .visit-panel {
-  width: min(520px, 100vw); height: 100vh; display: flex; flex-direction: column;
+  width: min(760px, 100vw); height: 100vh; display: flex; flex-direction: column;
   border-radius: var(--rounded-xl) 0 0 var(--rounded-xl); overflow: hidden;
 }
 .panel-header {

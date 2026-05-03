@@ -110,6 +110,28 @@ struct DayExtractionResult {
 
 fn extract_day_indexes(normalized: &str) -> DayExtractionResult {
   let tokens = tokenize_usage(normalized);
+  let explicit_days = collect_explicit_day_indexes(&tokens);
+
+  if explicit_days.is_empty() && tokens.iter().any(|token| token == "every_day") {
+    return DayExtractionResult {
+      day_indexes: (0..DAY_KEYS.len()).collect(),
+      note: None,
+    };
+  }
+
+  if !explicit_days.is_empty() {
+    let note = if tokens.iter().any(|token| token == "every_day") {
+      Some("พบข้อความทุกวันร่วมกับวันเฉพาะ จึงใช้วันเฉพาะที่ระบุไว้ในการคำนวณ".to_string())
+    } else {
+      None
+    };
+
+    return DayExtractionResult {
+      day_indexes: explicit_days,
+      note,
+    };
+  }
+
   if tokens.iter().any(|token| token == "every_day") {
     return DayExtractionResult {
       day_indexes: (0..DAY_KEYS.len()).collect(),
@@ -117,6 +139,20 @@ fn extract_day_indexes(normalized: &str) -> DayExtractionResult {
     };
   }
 
+  if contains_unspecified_day_hint(&tokens) {
+    return DayExtractionResult {
+      day_indexes: (0..DAY_KEYS.len()).collect(),
+      note: Some("ไม่พบวันในวิธีใช้ยา จึงตีความว่าให้รับประทานทุกวัน".to_string()),
+    };
+  }
+
+  DayExtractionResult {
+    day_indexes: (0..DAY_KEYS.len()).collect(),
+    note: Some("ไม่พบวันในวิธีใช้ยา จึงตีความว่าให้รับประทานทุกวัน".to_string()),
+  }
+}
+
+fn collect_explicit_day_indexes(tokens: &[String]) -> Vec<usize> {
   let mut matched_days = BTreeSet::new();
   let mut index = 0;
   while index < tokens.len() {
@@ -128,12 +164,12 @@ fn extract_day_indexes(normalized: &str) -> DayExtractionResult {
       }
     };
 
-    if index + 2 < tokens.len() && is_range_connector(&tokens[index + 1]) {
-      if let Some(end_day) = parse_day_token(&tokens[index + 2]) {
+    if let Some((connector_index, end_day_index, end_day)) = find_day_range(tokens, index) {
+      if connector_index == index + 1 || is_filler_token(&tokens[index + 1]) {
         for day in expand_day_range(current_day, end_day) {
           matched_days.insert(day);
         }
-        index += 3;
+        index = end_day_index + 1;
         continue;
       }
     }
@@ -142,21 +178,39 @@ fn extract_day_indexes(normalized: &str) -> DayExtractionResult {
     index += 1;
   }
 
-  if matched_days.is_empty() {
-    DayExtractionResult {
-      day_indexes: (0..DAY_KEYS.len()).collect(),
-      note: Some("ไม่พบวันในวิธีใช้ยา จึงตีความว่าให้รับประทานทุกวัน".to_string()),
+  matched_days.into_iter().collect()
+}
+
+fn find_day_range(tokens: &[String], start_day_index: usize) -> Option<(usize, usize, usize)> {
+  let mut connector_index = start_day_index + 1;
+  while connector_index < tokens.len() {
+    let token = &tokens[connector_index];
+    if is_range_connector(token) {
+      let mut end_day_index = connector_index + 1;
+      while end_day_index < tokens.len() {
+        let end_token = &tokens[end_day_index];
+        if let Some(end_day) = parse_day_token(end_token) {
+          return Some((connector_index, end_day_index, end_day));
+        }
+        if !is_filler_token(end_token) {
+          break;
+        }
+        end_day_index += 1;
+      }
+      break;
     }
-  } else {
-    DayExtractionResult {
-      day_indexes: matched_days.into_iter().collect(),
-      note: None,
+    if !is_filler_token(token) {
+      break;
     }
+    connector_index += 1;
   }
+
+  None
 }
 
 fn normalize_usage_text(input: &str) -> String {
   let mut text = input.to_lowercase();
+  let filler_dots_re = Regex::new(r"\.{2,}").expect("valid regex");
 
   for (thai_digit, arabic_digit) in [
     ('๐', '0'),
@@ -189,6 +243,15 @@ fn normalize_usage_text(input: &str) -> String {
     ("every day", " every_day "),
     ("qd", " every_day "),
     ("od", " every_day "),
+    ("เเสาร์", "เสาร์"),
+    ("วันจันทร์", " mon "),
+    ("วันอังคาร", " tue "),
+    ("วันพุธ", " wed "),
+    ("วันพฤหัสบดี", " thu "),
+    ("วันพฤหัส", " thu "),
+    ("วันศุกร์", " fri "),
+    ("วันเสาร์", " sat "),
+    ("วันอาทิตย์", " sun "),
     ("จันทร์", " mon "),
     ("อังคาร", " tue "),
     ("พุธ", " wed "),
@@ -230,6 +293,8 @@ fn normalize_usage_text(input: &str) -> String {
     .replace("thru", " thru ")
     .replace("through", " through ");
 
+  text = filler_dots_re.replace_all(&text, " ").into_owned();
+
   text
     .split_whitespace()
     .collect::<Vec<_>>()
@@ -267,6 +332,17 @@ fn parse_day_token(token: &str) -> Option<usize> {
 
 fn is_range_connector(token: &str) -> bool {
   matches!(token, "-" | "ถึง" | "to" | "thru" | "through")
+}
+
+fn is_filler_token(token: &str) -> bool {
+  matches!(
+    token,
+    "วัน" | "เฉพาะ" | "เฉพาะวัน" | "เฉพาะวันที่" | "ก่อนนอน" | "ครั้ง" | "ครั้งละ" | "วันละ"
+  )
+}
+
+fn contains_unspecified_day_hint(tokens: &[String]) -> bool {
+  tokens.iter().any(|token| token == "every_day")
 }
 
 fn expand_day_range(start: usize, end: usize) -> Vec<usize> {
@@ -358,5 +434,54 @@ mod tests {
     let result = parse_dispensing_usage("5 mg", "ก่อนนอน วันจันทร์ถึงศุกร์");
     assert!(result.dose.is_none());
     assert!(result.note.is_some());
+  }
+
+  #[test]
+  fn prefers_explicit_sunday_over_every_day_noise() {
+    let result = parse_dispensing_usage(
+      "3 mg",
+      "รับประทาน ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน ทุกวัน....อาทิตย์",
+    );
+    let dose = result.dose.expect("expected parsed dose");
+    assert_eq!(dose.mg_per_week, 3.0);
+    assert_eq!(dose.schedule.sun, 3.0);
+    assert_eq!(dose.schedule.mon, 0.0);
+  }
+
+  #[test]
+  fn parses_thai_range_with_day_prefix() {
+    let result = parse_dispensing_usage("2 mg", "กินครั้งละ 1 เม็ด ก่อนนอน วันจันทร์ ถึง วันเสาร์");
+    let dose = result.dose.expect("expected parsed dose");
+    assert_eq!(dose.mg_per_week, 12.0);
+    assert_eq!(dose.schedule.mon, 2.0);
+    assert_eq!(dose.schedule.sat, 2.0);
+    assert_eq!(dose.schedule.sun, 0.0);
+  }
+
+  #[test]
+  fn parses_specific_sunday_phrase() {
+    let result = parse_dispensing_usage("3 mg", "กินครั้งละ 1 เม็ด ก่อนนอน เฉพาะวันอาทิตย์");
+    let dose = result.dose.expect("expected parsed dose");
+    assert_eq!(dose.mg_per_week, 3.0);
+    assert_eq!(dose.schedule.sun, 3.0);
+    assert_eq!(dose.schedule.fri, 0.0);
+  }
+
+  #[test]
+  fn combines_split_weekly_regimen_correctly() {
+    let weekday = parse_dispensing_usage(
+      "3 mg",
+      "ใช้ตามแพทย์สั่ง กิน 1 เม็ด ก่อนนอน วันจันทร์ ถึง วันศุกร์",
+    )
+    .dose
+    .expect("weekday dose");
+    let saturday = parse_dispensing_usage(
+      "3 mg",
+      "ใช้ตามแพทย์สั่ง กิน ครึ่งเม็ด ก่อนนอน วันเสาร์",
+    )
+    .dose
+    .expect("saturday dose");
+
+    assert_eq!(weekday.mg_per_week + saturday.mg_per_week, 16.5);
   }
 }
