@@ -15,7 +15,7 @@ const pageTitle = computed(() => {
     '/settings': 'ตั้งค่าระบบ',
   }
   if (route.path.startsWith('/patient/')) return 'ข้อมูลผู้ป่วย'
-  if (route.path.startsWith('/slip/')) return 'ใบนำส่งแพทย์'
+  if (route.path.startsWith('/slip/')) return 'Warfarin Assessment & Recommendation'
   return map[route.path] ?? 'คลินิกวาร์ฟาริน'
 })
 

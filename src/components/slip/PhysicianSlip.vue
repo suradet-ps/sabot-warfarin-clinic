@@ -149,7 +149,7 @@ function ttrClass(v: number | null): string {
   <div class="slip-sheet">
     <div class="slip-header">
       <div class="slip-title">
-        <strong>ใบนำส่งแพทย์</strong>
+        <strong>Warfarin Assessment & Recommendation</strong>
         <span class="slip-subtitle">คลินิกวาร์ฟาริน {{ hospitalName }}</span>
       </div>
       <div class="slip-date">{{ formatThaiDate(visit.visitDate) }}</div>
