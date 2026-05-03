@@ -245,14 +245,6 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
               <span class="caption label">ค่า INR</span>
               <input class="input" type="number" step="0.1" v-model.number="inrValue" />
             </label>
-            <label class="form-field">
-              <span class="caption label">แหล่ง INR</span>
-              <select class="input" v-model="inrSource">
-                <option value="lab_order">ห้องแล็บ</option>
-                <option value="lab_app_order">ภายนอก</option>
-                <option value="manual">บันทึกเอง</option>
-              </select>
-            </label>
           </div>
 
           <div class="form-section">
@@ -372,7 +364,8 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
 }
 .panel-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl); }
 .panel-footer { display: flex; justify-content: flex-end; gap: var(--spacing-md); padding: var(--spacing-xl); border-top: 1px solid var(--color-hairline-soft); }
-.form-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--spacing-md); }
+.form-row { display: grid; grid-template-columns: 180px 120px; gap: var(--spacing-md); }
+.form-row .input { height: 44px; }
 .form-field { display: flex; flex-direction: column; gap: var(--spacing-xs); }
 .dose-source-card {
   display: flex;
