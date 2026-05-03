@@ -1,0 +1,94 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { ChevronDown, ChevronUp } from 'lucide-vue-next'
+import type { WfVisit } from '#/types/visit'
+import { formatThaiDate, normalizeDoseSchedule, doseDayLabels, doseDayKeys } from '#/utils/clinic'
+
+const props = defineProps<{ visits: WfVisit[]; hn: string }>()
+
+const expandedIds = ref<Set<number>>(new Set())
+
+const sortedVisits = computed(() =>
+  [...props.visits].sort((a, b) => `${b.visitDate}`.localeCompare(`${a.visitDate}`)),
+)
+
+function toggleExpand(id: number) {
+  if (expandedIds.value.has(id)) {
+    expandedIds.value.delete(id)
+  } else {
+    expandedIds.value.add(id)
+  }
+}
+
+const adherenceLabels: Record<string, string> = {
+  good: 'ดี',
+  fair: 'พอใช้',
+  poor: 'ไม่ดี',
+}
+
+function adherenceBadgeClass(a?: string | null) {
+  if (a === 'good') return 'badge-success'
+  if (a === 'poor') return 'badge-danger'
+  return 'badge-tag-coral'
+}
+</script>
+
+<template>
+  <div class="visit-list">
+    <div v-if="visits.length === 0" class="body-sm" style="color: var(--color-stone)">ยังไม่มีบันทึกการเยี่ยม</div>
+    <div v-for="v in sortedVisits" :key="v.id" class="visit-item card">
+      <div class="visit-header" @click="toggleExpand(v.id)">
+        <div class="visit-meta">
+          <span class="body-sm-medium">{{ formatThaiDate(v.visitDate) }}</span>
+          <span v-if="v.inrValue != null" class="badge badge-tag-coral">INR {{ v.inrValue.toFixed(1) }}</span>
+          <span v-if="v.newDoseMgday != null" class="caption" style="color: var(--color-slate)">
+            ยา {{ v.newDoseMgday.toFixed(1) }} mg/วัน
+          </span>
+          <span v-if="v.adherence" :class="['badge', adherenceBadgeClass(v.adherence)]">
+            {{ adherenceLabels[v.adherence] ?? v.adherence }}
+          </span>
+        </div>
+        <component :is="expandedIds.has(v.id) ? ChevronUp : ChevronDown" :size="16" style="color: var(--color-slate); flex-shrink: 0" />
+      </div>
+
+      <div v-if="expandedIds.has(v.id)" class="visit-detail">
+        <div v-if="v.physician" class="detail-row">
+          <span class="caption" style="color: var(--color-slate)">แพทย์:</span>
+          <span class="body-sm">{{ v.physician }}</span>
+        </div>
+        <div v-if="v.nextAppointment" class="detail-row">
+          <span class="caption" style="color: var(--color-slate)">นัดต่อไป:</span>
+          <span class="body-sm">{{ formatThaiDate(v.nextAppointment) }}</span>
+        </div>
+        <div v-if="v.nextInrDue" class="detail-row">
+          <span class="caption" style="color: var(--color-slate)">ตรวจ INR:</span>
+          <span class="body-sm">{{ formatThaiDate(v.nextInrDue) }}</span>
+        </div>
+        <div v-if="v.newDoseDetail" class="detail-row">
+          <span class="caption" style="color: var(--color-slate)">ตารางยาใหม่:</span>
+          <div class="dose-mini-grid">
+            <span v-for="k in doseDayKeys" :key="k" class="dose-cell">
+              <span class="caption" style="color: var(--color-stone)">{{ doseDayLabels[k] }}</span>
+              <span class="body-sm">{{ normalizeDoseSchedule(v.newDoseDetail)[k] }}</span>
+            </span>
+          </div>
+        </div>
+        <div v-if="v.notes" class="detail-row">
+          <span class="caption" style="color: var(--color-slate)">หมายเหตุ:</span>
+          <span class="body-sm">{{ v.notes }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.visit-list { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.visit-item { padding: var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.visit-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; gap: var(--spacing-sm); }
+.visit-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+.visit-detail { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: 1px solid var(--color-hairline-soft); }
+.detail-row { display: flex; gap: var(--spacing-sm); align-items: flex-start; }
+.dose-mini-grid { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+.dose-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+</style>

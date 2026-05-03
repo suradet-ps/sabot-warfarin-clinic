@@ -1,0 +1,268 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { X } from 'lucide-vue-next'
+import DayDoseTable from '#/components/visit/DayDoseTable.vue'
+import type { InrRecord } from '#/types/inr'
+import type { DoseSuggestion, VisitInput, WfVisit } from '#/types/visit'
+import {
+  dateInputToday,
+  emptyDoseSchedule,
+  normalizeDoseSchedule,
+  scheduleAverageDose,
+} from '#/utils/clinic'
+
+const props = defineProps<{ hn: string }>()
+const modelValue = defineModel<boolean>({ default: false })
+const emit = defineEmits<{ (e: 'saved', visitId: number): void }>()
+
+const saving = ref(false)
+const error = ref<string | null>(null)
+const loadingSuggestion = ref(false)
+
+const visitDate = ref(dateInputToday())
+const inrValue = ref<number | null>(null)
+const inrSource = ref<'lab_order' | 'lab_app_order' | 'manual'>('lab_order')
+const currentDoseMgday = ref<number | null>(null)
+const currentDoseDetail = ref(emptyDoseSchedule())
+const newDoseMgday = ref<number | null>(null)
+const newDoseDetail = ref(emptyDoseSchedule())
+const nextAppointment = ref('')
+const nextInrDue = ref('')
+const physician = ref('')
+const adherence = ref<'good' | 'fair' | 'poor'>('good')
+const notes = ref('')
+const suggestion = ref<DoseSuggestion | null>(null)
+const targetLow = ref(2.0)
+const targetHigh = ref(3.0)
+
+const sideEffectOptions = [
+  { key: 'bleeding_gums', label: 'เหงือกเลือดออก' },
+  { key: 'bruising', label: 'เลือดออกใต้ผิว' },
+  { key: 'blood_urine', label: 'เลือดออกในปัสสาวะ' },
+  { key: 'blood_stool', label: 'เลือดออกในอุจจาระ' },
+  { key: 'nausea', label: 'คลื่นไส้' },
+  { key: 'hair_loss', label: 'ผมร่วง' },
+  { key: 'other', label: 'อื่นๆ' },
+]
+const selectedSideEffects = ref<string[]>([])
+
+async function loadDefaults() {
+  try {
+    const [latestInr, visits, patientData] = await Promise.all([
+      invoke<InrRecord | null>('get_latest_inr', { hn: props.hn }),
+      invoke<WfVisit[]>('get_visit_history', { hn: props.hn }),
+      invoke<{ patient: { targetInrLow: number; targetInrHigh: number } }>('get_patient_detail', { hn: props.hn }),
+    ])
+    if (latestInr) {
+      inrValue.value = latestInr.value
+      inrSource.value = latestInr.source as typeof inrSource.value ?? 'lab_order'
+    }
+    const lastVisit = visits[0]
+    if (lastVisit) {
+      currentDoseMgday.value = lastVisit.newDoseMgday ?? lastVisit.currentDoseMgday ?? null
+      currentDoseDetail.value = normalizeDoseSchedule(lastVisit.newDoseDetail ?? lastVisit.doseDetail)
+    }
+    targetLow.value = patientData.patient.targetInrLow
+    targetHigh.value = patientData.patient.targetInrHigh
+  } catch {
+    // non-critical
+  }
+}
+
+async function fetchSuggestion() {
+  if (currentDoseMgday.value === null || inrValue.value === null) return
+  loadingSuggestion.value = true
+  try {
+    suggestion.value = await invoke<DoseSuggestion>('suggest_dose', {
+      currentDose: currentDoseMgday.value,
+      currentInr: inrValue.value,
+      targetLow: targetLow.value,
+      targetHigh: targetHigh.value,
+    })
+    if (suggestion.value) {
+      newDoseMgday.value = suggestion.value.suggestedDoseMgday
+    }
+  } catch {
+    // non-critical
+  } finally {
+    loadingSuggestion.value = false
+  }
+}
+
+const currentDoseAvg = computed(() => scheduleAverageDose(currentDoseDetail.value))
+const newDoseAvg = computed(() => scheduleAverageDose(newDoseDetail.value))
+
+watch(currentDoseDetail, () => {
+  currentDoseMgday.value = currentDoseAvg.value
+}, { deep: true })
+watch(newDoseDetail, () => {
+  newDoseMgday.value = newDoseAvg.value
+}, { deep: true })
+
+async function handleSubmit() {
+  saving.value = true
+  error.value = null
+  try {
+    const input: VisitInput = {
+      hn: props.hn,
+      visitDate: visitDate.value,
+      inrValue: inrValue.value ?? undefined,
+      inrSource: inrSource.value,
+      currentDoseMgday: currentDoseMgday.value ?? undefined,
+      doseDetail: currentDoseDetail.value,
+      newDoseMgday: newDoseMgday.value ?? undefined,
+      newDoseDetail: newDoseDetail.value,
+      doseChanged: newDoseMgday.value !== currentDoseMgday.value,
+      nextAppointment: nextAppointment.value || undefined,
+      nextInrDue: nextInrDue.value || undefined,
+      physician: physician.value || undefined,
+      adherence: adherence.value,
+      sideEffects: selectedSideEffects.value,
+      notes: notes.value || undefined,
+    }
+    const visitId = await invoke<number>('save_visit', { visit: input })
+    emit('saved', visitId)
+    modelValue.value = false
+  } catch (e) {
+    error.value = String(e)
+  } finally {
+    saving.value = false
+  }
+}
+
+watch(() => modelValue.value, (open) => {
+  if (open) void loadDefaults()
+})
+onMounted(() => { if (modelValue.value) void loadDefaults() })
+</script>
+
+<template>
+  <Teleport to="body">
+    <div v-if="modelValue" class="panel-overlay" @click.self="modelValue = false">
+      <div class="visit-panel card">
+        <div class="panel-header">
+          <h3 class="h4">บันทึกการเยี่ยม</h3>
+          <button class="btn btn-ghost" @click="modelValue = false"><X :size="18" /></button>
+        </div>
+
+        <div v-if="error" class="card card-feature-coral body-sm" style="padding: var(--spacing-md)">{{ error }}</div>
+
+        <div class="panel-body">
+          <div class="form-row">
+            <label class="form-field">
+              <span class="caption label">วันที่</span>
+              <input class="input" type="date" v-model="visitDate" />
+            </label>
+            <label class="form-field">
+              <span class="caption label">ค่า INR</span>
+              <input class="input" type="number" step="0.1" v-model.number="inrValue" />
+            </label>
+            <label class="form-field">
+              <span class="caption label">แหล่ง INR</span>
+              <select class="input" v-model="inrSource">
+                <option value="lab_order">ห้องแล็บ</option>
+                <option value="lab_app_order">ภายนอก</option>
+                <option value="manual">บันทึกเอง</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-section">
+            <p class="caption label">ตารางยาเดิม (mg/วัน)</p>
+            <DayDoseTable v-model="currentDoseDetail" />
+            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ currentDoseAvg.toFixed(2) }} mg/วัน</p>
+          </div>
+
+          <div class="suggestion-row">
+            <button class="btn btn-secondary" @click="fetchSuggestion" :disabled="loadingSuggestion || inrValue === null">
+              {{ loadingSuggestion ? 'กำลังคำนวณ...' : 'คำนวณขนาดยา' }}
+            </button>
+            <span v-if="suggestion" class="body-sm">
+              แนะนำ: <strong>{{ suggestion.suggestedDoseMgday.toFixed(1) }} mg/วัน</strong> &mdash; {{ suggestion.recommendation }}
+            </span>
+          </div>
+
+          <div class="form-section">
+            <p class="caption label">ตารางยาใหม่ (mg/วัน)</p>
+            <DayDoseTable v-model="newDoseDetail" />
+            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ newDoseAvg.toFixed(2) }} mg/วัน</p>
+          </div>
+
+          <div class="form-row">
+            <label class="form-field">
+              <span class="caption label">นัดครั้งต่อไป</span>
+              <input class="input" type="date" v-model="nextAppointment" />
+            </label>
+            <label class="form-field">
+              <span class="caption label">ตรวจ INR ครั้งต่อไป</span>
+              <input class="input" type="date" v-model="nextInrDue" />
+            </label>
+            <label class="form-field">
+              <span class="caption label">แพทย์</span>
+              <input class="input" v-model="physician" />
+            </label>
+          </div>
+
+          <div class="form-section">
+            <p class="caption label">การรับประทานยา</p>
+            <div class="radio-group">
+              <label v-for="opt in [['good', 'ดี'], ['fair', 'พอใช้'], ['poor', 'ไม่ดี']]" :key="opt[0]" class="radio-label">
+                <input type="radio" :value="opt[0]" v-model="adherence" />
+                {{ opt[1] }}
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <p class="caption label">อาการไม่พึงประสงค์</p>
+            <div class="checkbox-grid">
+              <label v-for="se in sideEffectOptions" :key="se.key" class="checkbox-label">
+                <input type="checkbox" :value="se.key" v-model="selectedSideEffects" />
+                {{ se.label }}
+              </label>
+            </div>
+          </div>
+
+          <label class="form-field">
+            <span class="caption label">หมายเหตุ</span>
+            <textarea class="input" rows="3" v-model="notes" />
+          </label>
+        </div>
+
+        <div class="panel-footer">
+          <button class="btn btn-ghost" @click="modelValue = false">ยกเลิก</button>
+          <button class="btn btn-primary" @click="handleSubmit" :disabled="saving">
+            {{ saving ? 'กำลังบันทึก...' : 'บันทึก' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+</template>
+
+<style scoped>
+.panel-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 50;
+  display: flex; align-items: stretch; justify-content: flex-end;
+}
+.visit-panel {
+  width: min(520px, 100vw); height: 100vh; display: flex; flex-direction: column;
+  border-radius: var(--rounded-xl) 0 0 var(--rounded-xl); overflow: hidden;
+}
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--spacing-xl); border-bottom: 1px solid var(--color-hairline-soft);
+}
+.panel-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl); }
+.panel-footer { display: flex; justify-content: flex-end; gap: var(--spacing-md); padding: var(--spacing-xl); border-top: 1px solid var(--color-hairline-soft); }
+.form-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--spacing-md); }
+.form-field { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.form-section { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.label { color: var(--color-slate); }
+.suggestion-row { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
+.radio-group { display: flex; gap: var(--spacing-lg); }
+.radio-label { display: flex; align-items: center; gap: var(--spacing-xs); cursor: pointer; }
+.checkbox-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacing-xs); }
+.checkbox-label { display: flex; align-items: center; gap: var(--spacing-xs); cursor: pointer; }
+</style>

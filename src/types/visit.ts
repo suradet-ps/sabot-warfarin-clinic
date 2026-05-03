@@ -1,0 +1,57 @@
+export interface DoseSchedule {
+  mon: number
+  tue: number
+  wed: number
+  thu: number
+  fri: number
+  sat: number
+  sun: number
+}
+
+export interface WfVisit {
+  id: number
+  hn: string
+  visitDate: string
+  inrValue?: number
+  inrSource?: 'lab_order' | 'lab_app_order' | 'manual'
+  currentDoseMgday?: number
+  doseDetail?: DoseSchedule
+  newDoseMgday?: number
+  newDoseDetail?: DoseSchedule
+  doseChanged: boolean
+  nextAppointment?: string
+  nextInrDue?: string
+  physician?: string
+  notes?: string
+  sideEffects?: string[]
+  adherence?: 'good' | 'fair' | 'poor'
+  createdBy?: string
+  createdAt: string
+}
+
+export interface VisitInput {
+  hn: string
+  visitDate: string
+  inrValue?: number
+  inrSource?: string
+  currentDoseMgday?: number
+  doseDetail?: DoseSchedule
+  newDoseMgday?: number
+  newDoseDetail?: DoseSchedule
+  doseChanged: boolean
+  nextAppointment?: string
+  nextInrDue?: string
+  physician?: string
+  notes?: string
+  sideEffects?: string[]
+  adherence?: string
+  createdBy?: string
+}
+
+export interface DoseSuggestion {
+  suggestedDoseMgday: number
+  adjustmentPercent: number
+  recommendation: string
+  urgency: 'normal' | 'caution' | 'urgent' | 'hold'
+  recheckDays: number
+}

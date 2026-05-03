@@ -1,0 +1,9 @@
+pub mod alerts;
+pub mod appointments;
+pub mod inr;
+pub mod outcomes;
+pub mod patients;
+pub mod reports;
+pub mod screening;
+pub mod settings;
+pub mod visits;

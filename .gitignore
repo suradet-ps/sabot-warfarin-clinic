@@ -1,0 +1,67 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend build output (Vite)
+dist/
+.vite/
+.cache/
+build/
+out/
+
+# Vite dev cache
+.vite/
+
+# Rust / Cargo build outputs
+/target/
+/src-tauri/target/
+**/target/
+
+# Tauri bundles (packaging outputs)
+/src-tauri/bundles/
+
+# Local databases and runtime artifacts
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files (keep examples)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDEs and editors
+.vscode/
+.idea/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# Temporary and editor swap files
+*.swp
+*.swo
+*~
+*.tmp
+
+# Test coverage
+coverage/
+.nyc_output/
+coverage-final.json
+
+# Generated docs
+target/doc/
+doc/
+
+# Misc caches
+.cache/
+.history/

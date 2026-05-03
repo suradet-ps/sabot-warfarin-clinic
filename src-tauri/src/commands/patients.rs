@@ -1,0 +1,275 @@
+//! Patient management commands — enroll, list, detail, status change.
+
+use tauri::State;
+
+use crate::{
+  db::{
+    mysql::{get_dispensing_history, get_hosxp_patient, DbConfig},
+    sqlite::{
+      enroll_patient as db_enroll, get_active_patients as db_get_active, get_inr_from_visits,
+      get_patient_by_hn, get_pending_appointments, get_setting, get_visit_history,
+      update_patient_status as db_update_status, AppState,
+    },
+  },
+  dose::calculator::calculate_ttr,
+  models::{
+    alert::PatientAlert,
+    inr::InrRecord,
+    patient::{ActivePatientSummary, EnrollmentInput, HosxpPatient, PatientDetail, WfPatient},
+  },
+};
+
+#[tauri::command]
+pub async fn get_active_patients(state: State<'_, AppState>) -> Result<Vec<WfPatient>, String> {
+  db_get_active(&state.pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_active_patient_summaries(
+  state: State<'_, AppState>,
+) -> Result<Vec<ActivePatientSummary>, String> {
+  let patients = db_get_active(&state.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+  let hns: Vec<String> = patients.iter().map(|patient| patient.hn.clone()).collect();
+  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+    .await
+    .ok()
+    .flatten()
+    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+
+  let (hosxp_map, mysql_inr_map) = if let Some(config) = config_result {
+    crate::db::mysql::get_dashboard_patient_data(&config, &hns)
+      .await
+      .unwrap_or_else(|_| {
+        (
+          std::collections::HashMap::new(),
+          std::collections::HashMap::new(),
+        )
+      })
+  } else {
+    (
+      std::collections::HashMap::new(),
+      std::collections::HashMap::new(),
+    )
+  };
+
+  let appointments = get_pending_appointments(&state.pool)
+    .await
+    .unwrap_or_default();
+
+  let mut summaries = Vec::with_capacity(patients.len());
+  for patient in patients {
+    let inr_records = match mysql_inr_map.get(&patient.hn) {
+      Some(records) if !records.is_empty() => records.clone(),
+      _ => get_inr_from_visits(&state.pool, &patient.hn)
+        .await
+        .unwrap_or_default(),
+    };
+    let latest_inr = inr_records.last().cloned();
+    let inr_pairs: Vec<(String, f64)> = inr_records
+      .iter()
+      .map(|record| (record.date.clone(), record.value))
+      .collect();
+    let ttr6months = calculate_ttr(
+      &inr_pairs,
+      patient.target_inr_low,
+      patient.target_inr_high,
+      182,
+    );
+    let current_dose_mgday = get_visit_history(&state.pool, &patient.hn)
+      .await
+      .unwrap_or_default()
+      .into_iter()
+      .next()
+      .and_then(|visit| visit.new_dose_mgday.or(visit.current_dose_mgday));
+    let next_appointment = appointments
+      .iter()
+      .find(|appointment| appointment.hn == patient.hn)
+      .map(|appointment| appointment.appt_date.clone());
+
+    summaries.push(ActivePatientSummary {
+      hosxp_info: hosxp_map
+        .get(&patient.hn)
+        .cloned()
+        .unwrap_or_else(|| HosxpPatient {
+          hn: patient.hn.clone(),
+          pname: String::new(),
+          fname: format!("HN {}", patient.hn),
+          lname: "(ไม่พบข้อมูล HosXP)".to_string(),
+          birthday: String::new(),
+          sex: "U".to_string(),
+          addrpart: None,
+          phone: None,
+        }),
+      patient,
+      latest_inr,
+      current_dose_mgday,
+      ttr6months,
+      next_appointment,
+    });
+  }
+
+  Ok(summaries)
+}
+
+#[tauri::command]
+pub async fn enroll_patient(
+  input: EnrollmentInput,
+  state: State<'_, AppState>,
+) -> Result<i64, String> {
+  db_enroll(&state.pool, &input)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_patient_detail(
+  hn: String,
+  state: State<'_, AppState>,
+) -> Result<PatientDetail, String> {
+  let patient = get_patient_by_hn(&state.pool, &hn)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| format!("patient not found: {hn}"))?;
+
+  // Fetch HosXP demographics — graceful fallback if MySQL is unavailable.
+  let hosxp_info = try_get_hosxp_patient(&state, &hn).await;
+
+  // Combine INR from clinic visits (SQLite) as fallback / supplement.
+  let inr_records = get_inr_records(&state, &hn).await;
+  let dispensing_history = try_get_dispensing_history(&state, &hn).await;
+
+  let latest_inr = inr_records
+    .iter()
+    .max_by(|a, b| a.date.cmp(&b.date))
+    .cloned();
+
+  // Latest confirmed new dose from most recent visit.
+  let visits = get_visit_history(&state.pool, &hn)
+    .await
+    .unwrap_or_default();
+  let current_dose = visits.first().and_then(|v| v.new_dose_mgday);
+
+  // TTR over last 6 months (182 days).
+  let inr_pairs: Vec<(String, f64)> = inr_records
+    .iter()
+    .map(|r| (r.date.clone(), r.value))
+    .collect();
+  let ttr6 = calculate_ttr(
+    &inr_pairs,
+    patient.target_inr_low,
+    patient.target_inr_high,
+    182,
+  );
+
+  // Next scheduled appointment.
+  let appointments = get_pending_appointments(&state.pool)
+    .await
+    .unwrap_or_default();
+  let next_appt = appointments
+    .iter()
+    .find(|a| a.hn == hn)
+    .map(|a| a.appt_date.clone());
+
+  Ok(PatientDetail {
+    patient,
+    hosxp_info,
+    latest_inr,
+    current_dose_mgday: current_dose,
+    ttr6months: ttr6,
+    next_appointment: next_appt,
+    alerts: Vec::<PatientAlert>::new(),
+    inr_history: inr_records,
+    dispensing_history,
+  })
+}
+
+#[tauri::command]
+pub async fn update_patient_status(
+  hn: String,
+  status: String,
+  reason: String,
+  effective_date: Option<String>,
+  state: State<'_, AppState>,
+) -> Result<(), String> {
+  db_update_status(
+    &state.pool,
+    &hn,
+    &status,
+    Some(reason.as_str()),
+    effective_date.as_deref(),
+  )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Attempts to fetch patient demographics from HosXP MySQL, returning a
+/// placeholder on any failure so the UI is never blocked.
+async fn try_get_hosxp_patient(state: &AppState, hn: &str) -> HosxpPatient {
+  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+    .await
+    .ok()
+    .flatten()
+    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+
+  if let Some(config) = config_result {
+    if let Ok(Some(info)) = get_hosxp_patient(&config, hn).await {
+      return info;
+    }
+  }
+
+  HosxpPatient {
+    hn: hn.to_string(),
+    pname: "".to_string(),
+    fname: format!("HN {hn}"),
+    lname: "(ไม่พบข้อมูล HosXP)".to_string(),
+    birthday: "".to_string(),
+    sex: "U".to_string(),
+    addrpart: None,
+    phone: None,
+  }
+}
+
+async fn try_get_dispensing_history(
+  state: &AppState,
+  hn: &str,
+) -> Vec<crate::models::dispensing::DispensingRecord> {
+  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+    .await
+    .ok()
+    .flatten()
+    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+
+  if let Some(config) = config_result {
+    if let Ok(records) = get_dispensing_history(&config, hn).await {
+      return records;
+    }
+  }
+
+  Vec::new()
+}
+
+/// Returns INR records, preferring HosXP MySQL (dual-source merge) and
+/// falling back to clinic-recorded INR values from `wf_visits`.
+pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord> {
+  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+    .await
+    .ok()
+    .flatten()
+    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+
+  if let Some(config) = config_result {
+    if let Ok(records) = crate::db::mysql::get_inr_history(&config, hn).await {
+      if !records.is_empty() {
+        return records;
+      }
+    }
+  }
+
+  get_inr_from_visits(&state.pool, hn)
+    .await
+    .unwrap_or_default()
+}
