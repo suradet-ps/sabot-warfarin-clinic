@@ -48,15 +48,16 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.sidebar { width: 15rem; min-width: 15rem; background: var(--color-primary); display: flex; flex-direction: column; padding: var(--spacing-xl) 0; }
+.sidebar { width: 15rem; min-width: 15rem; background: var(--color-surface); display: flex; flex-direction: column; padding: var(--spacing-xl) 0; border-right: 1px solid var(--color-hairline-soft); }
 .sidebar-logo { display: flex; align-items: center; gap: var(--spacing-sm); padding: 0 var(--spacing-xl) var(--spacing-xxl); }
 .sidebar-logo-icon { color: var(--color-brand-coral); width: 40px; height: 40px; flex-shrink: 0; }
 .sidebar-logo-text { display: flex; flex-direction: column; }
-.sidebar-logo-title { font-size: var(--typography-heading-5-size); font-weight: var(--typography-heading-5-weight); color: var(--color-on-dark); }
-.sidebar-logo-sub,.footer-text { color: var(--color-on-dark-muted); }
+.sidebar-logo-title { font-size: var(--typography-heading-5-size); font-weight: var(--typography-heading-5-weight); color: var(--color-ink); }
+.sidebar-logo-sub,.footer-text { color: var(--color-slate); }
 .sidebar-nav { list-style: none; flex: 1; display: flex; flex-direction: column; gap: var(--spacing-xxs); padding: 0 var(--spacing-sm); }
-.sidebar-nav-item { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--rounded-full); color: var(--color-on-dark-muted); text-decoration: none; }
-.sidebar-nav-item.active { background: color-mix(in srgb, var(--color-on-dark) 12%, transparent); color: var(--color-on-dark); }
+.sidebar-nav-item { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--rounded-full); color: var(--color-slate); text-decoration: none; }
+.sidebar-nav-item:hover { background: var(--color-surface-soft); }
+.sidebar-nav-item.active { background: var(--color-brand-teal); color: var(--color-on-dark); }
 .sidebar-badge { margin-left: auto; padding: 0 var(--spacing-xs); border-radius: var(--rounded-full); background: var(--color-brand-red-dark); color: var(--color-on-dark); }
-.sidebar-footer { padding: var(--spacing-xl); border-top: 1px solid color-mix(in srgb, var(--color-on-dark) 12%, transparent); margin-top: var(--spacing-xl); }
+.sidebar-footer { padding: var(--spacing-xl); border-top: 1px solid var(--color-hairline-soft); margin-top: var(--spacing-xl); }
 </style>
