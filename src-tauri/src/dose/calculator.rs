@@ -12,65 +12,72 @@ fn round_to_half_mg(value: f64) -> f64 {
 /// Computes a warfarin dose adjustment suggestion given the current dose,
 /// current INR, and the patient's target INR range.
 ///
-/// # Algorithm (per AHA/ACC guidelines adapted for Thai practice)
+/// # Algorithm (per Thai clinical practice guidelines)
 ///
-/// | INR range                    | Adjustment  | Urgency  | Recheck |
-/// |------------------------------|-------------|----------|---------|
-/// | > 5.0                        | Hold, −25%  | hold     | 1–3 d   |
-/// | 4.0 – 5.0                    | Hold, −20%  | hold     | 3–7 d   |
-/// | target_high + 0.5 – 4.0      | −15–20%     | urgent   | 7 d     |
-/// | target_high – target_high+0.5| −10%        | caution  | 14 d    |
-/// | In therapeutic range         | 0%          | normal   | 28–42 d |
-/// | target_low−0.5 – target_low  | +10%        | caution  | 14 d    |
-/// | < target_low − 0.5           | +15–20%     | urgent   | 7–14 d  |
+/// | INR range   | Adjustment | Urgency | Recheck |
+/// |-------------|------------|---------|---------|
+/// | < 1.5       | +10-20%    | urgent  | 7-14 d  |
+/// | 1.5 - 1.9   | +5-10%     | caution | 14 d    |
+/// | 2.0 - 3.0   | 0%         | normal  | 28-42 d |
+/// | 3.1 - 3.9   | -5-10%     | caution | 14 d    |
+/// | 4.0 - 4.9   | Hold 1d, -10% | hold | 7 d    |
+/// | 5.0 - 8.9   | Hold 1-2d, Vit K, -10% | hold | 3-7 d |
+/// | >= 9.0      | Hold 1-2d, Vit K 1-10mg, -10% | hold | 1-3 d |
 pub fn suggest_dose(
   current_dose: f64,
   inr: f64,
-  target_low: f64,
-  target_high: f64,
+  _target_low: f64,
+  _target_high: f64,
 ) -> DoseSuggestion {
-  let above_high = inr - target_high;
-  let below_low = target_low - inr;
-
   let (adjustment_percent, recommendation, urgency, recheck_days): (f64, &str, &str, u32) =
-    if inr > 5.0 {
+    if inr >= 9.0 {
       (
-        -25.0,
-        "หยุดยาทันทีและประเมินเร่งด่วน — INR > 5.0 เสี่ยงเลือดออกรุนแรง",
+        -10.0,
+        "หยุดยา 1-2 วัน และให้ Vitamin K 1-10 mg PO และลดขนาดยา 10%",
         "hold",
         2,
       )
-    } else if inr > 4.0 {
+    } else if inr >= 5.0 {
       (
-        -20.0,
-        "งดยา 1 มื้อ แล้วลดขนาดยา 20% นัดตรวจ INR ใหม่ใน 3–7 วัน",
+        -10.0,
+        "หยุดยา 1-2 วัน และให้ Vitamin K 1 mg PO และลดขนาดยา 10%",
         "hold",
         5,
       )
-    } else if above_high > 0.5 {
-      (-15.0, "ลดขนาดยา 15% นัดตรวจ INR ใหม่ใน 7 วัน", "urgent", 7)
-    } else if above_high > 0.0 {
+    } else if inr >= 4.0 {
       (
         -10.0,
-        "ลดขนาดยาเล็กน้อย 10% นัดตรวจ INR ใหม่ใน 14 วัน",
+        "หยุดยา 1 วัน และลดขนาดยา 10%",
+        "hold",
+        7,
+      )
+    } else if inr > 3.0 {
+      (
+        -7.5,
+        "ลดขนาดยา 5-10% นัดตรวจ INR ใหม่ใน 14 วัน",
         "caution",
         14,
       )
-    } else if below_low > 0.5 {
-      (15.0, "เพิ่มขนาดยา 15% นัดตรวจ INR ใหม่ใน 7–14 วัน", "urgent", 10)
-    } else if below_low > 0.0 {
+    } else if inr >= 2.0 {
       (
-        10.0,
-        "เพิ่มขนาดยาเล็กน้อย 10% นัดตรวจ INR ใหม่ใน 14 วัน",
+        0.0,
+        "คงขนาดยาเดิม นัดตรวจ INR ใน 4-6 สัปดาห์",
+        "normal",
+        35,
+      )
+    } else if inr >= 1.5 {
+      (
+        7.5,
+        "เพิ่มขนาดยา 5-10% นัดตรวจ INR ใหม่ใน 14 วัน",
         "caution",
         14,
       )
     } else {
       (
-        0.0,
-        "INR อยู่ในเป้าหมาย — คงขนาดยาเดิม นัดตรวจ INR ใน 4–6 สัปดาห์",
-        "normal",
-        35,
+        15.0,
+        "เพิ่มขนาดยา 10-20% นัดตรวจ INR ใหม่ใน 7-14 วัน",
+        "urgent",
+        10,
       )
     };
 
@@ -173,53 +180,54 @@ mod tests {
   }
 
   #[test]
-  fn suggest_dose_slightly_above_high_decreases_10_percent() {
+  fn suggest_dose_above_3_0_decreases_7_5_percent() {
     let result = suggest_dose(5.0, 3.3, 2.0, 3.0);
-    assert_eq!(result.adjustment_percent, -10.0);
+    assert_eq!(result.adjustment_percent, -7.5);
     assert_eq!(result.urgency, "caution");
+    // 5.0 * 0.925 = 4.625 → rounded to 4.5
+    assert_eq!(result.suggested_dose_mgday, 4.5);
+  }
+
+  #[test]
+  fn suggest_dose_above_3_0_still_decreases() {
+    let result = suggest_dose(5.0, 3.7, 2.0, 3.0);
+    assert_eq!(result.adjustment_percent, -7.5);
+    assert_eq!(result.urgency, "caution");
+    // 5.0 * 0.925 = 4.625 → rounded to 4.5
+    assert_eq!(result.suggested_dose_mgday, 4.5);
+  }
+
+  #[test]
+  fn suggest_dose_4_to_5_hold_and_reduce_10() {
+    let result = suggest_dose(5.0, 4.5, 2.0, 3.0);
+    assert_eq!(result.adjustment_percent, -10.0);
+    assert_eq!(result.urgency, "hold");
     // 5.0 * 0.90 = 4.5
     assert_eq!(result.suggested_dose_mgday, 4.5);
+    assert_eq!(result.recheck_days, 7);
   }
 
   #[test]
-  fn suggest_dose_significantly_above_high_decreases_15_percent() {
-    let result = suggest_dose(5.0, 3.7, 2.0, 3.0);
-    assert_eq!(result.adjustment_percent, -15.0);
-    assert_eq!(result.urgency, "urgent");
-    // 5.0 * 0.85 = 4.25 → rounded to 4.5
-    assert_eq!(result.suggested_dose_mgday, 4.5);
-  }
-
-  #[test]
-  fn suggest_dose_critical_high_4_to_5_hold_and_reduce_20() {
-    let result = suggest_dose(5.0, 4.5, 2.0, 3.0);
-    assert_eq!(result.adjustment_percent, -20.0);
-    assert_eq!(result.urgency, "hold");
-    // 5.0 * 0.80 = 4.0
-    assert_eq!(result.suggested_dose_mgday, 4.0);
-  }
-
-  #[test]
-  fn suggest_dose_over_5_hold_and_reduce_25() {
+  fn suggest_dose_over_5_hold_vit_k() {
     let result = suggest_dose(5.0, 5.5, 2.0, 3.0);
-    assert_eq!(result.adjustment_percent, -25.0);
+    assert_eq!(result.adjustment_percent, -10.0);
     assert_eq!(result.urgency, "hold");
-    // 5.0 * 0.75 = 3.75 → rounded to 4.0
-    assert_eq!(result.suggested_dose_mgday, 4.0);
-    assert_eq!(result.recheck_days, 2);
+    // 5.0 * 0.90 = 4.5
+    assert_eq!(result.suggested_dose_mgday, 4.5);
+    assert_eq!(result.recheck_days, 5);
   }
 
   #[test]
-  fn suggest_dose_slightly_below_low_increases_10_percent() {
+  fn suggest_dose_1_5_to_1_9_increases_7_5_percent() {
     let result = suggest_dose(5.0, 1.8, 2.0, 3.0);
-    assert_eq!(result.adjustment_percent, 10.0);
+    assert_eq!(result.adjustment_percent, 7.5);
     assert_eq!(result.urgency, "caution");
-    // 5.0 * 1.10 = 5.5
+    // 5.0 * 1.075 = 5.375 → rounded to 5.5
     assert_eq!(result.suggested_dose_mgday, 5.5);
   }
 
   #[test]
-  fn suggest_dose_significantly_below_low_increases_15_percent() {
+  fn suggest_dose_below_1_5_increases_15_percent() {
     let result = suggest_dose(5.0, 1.3, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, 15.0);
     assert_eq!(result.urgency, "urgent");
@@ -229,9 +237,9 @@ mod tests {
 
   #[test]
   fn suggest_dose_rounds_to_half_mg() {
-    // 3.0 * 1.10 = 3.3 → rounds to 3.5
+    // 3.0 * 1.075 = 3.225 → rounds to 3.0
     let result = suggest_dose(3.0, 1.8, 2.0, 3.0);
-    assert_eq!(result.suggested_dose_mgday, 3.5);
+    assert_eq!(result.suggested_dose_mgday, 3.0);
   }
 
   #[test]

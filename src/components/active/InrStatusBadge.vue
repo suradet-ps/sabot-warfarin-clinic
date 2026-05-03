@@ -18,6 +18,7 @@ const status = computed<InrStatus>(() => {
   if (props.inrValue < 1.5) return 'critical_low'
   if (props.inrValue > props.targetHigh) return 'above'
   if (props.inrValue < props.targetLow) return 'below'
+  if (props.inrValue >= props.targetLow && props.inrValue <= props.targetHigh) return 'in_range'
   return 'in_range'
 })
 
@@ -37,19 +38,14 @@ const config = computed(() => {
 <template>
   <div class="inr-status">
     <span :class="['badge', config.className]">
-      <span :class="['status-dot', config.dotClass]" />
-      {{ inrValue !== null && inrValue !== undefined ? inrValue.toFixed(1) : '-' }}
+      {{ inrValue !== null && inrValue !== undefined ? inrValue.toFixed(2) : '-' }}
     </span>
     <span class="caption inr-label">{{ config.label }}</span>
   </div>
 </template>
 
 <style scoped>
-.inr-status { display: flex; flex-direction: column; gap: var(--spacing-xxs); }
-.inr-label { color: var(--color-slate); }
-.status-dot { width: var(--spacing-xs); height: var(--spacing-xs); border-radius: var(--rounded-full); }
-.dot-success { background: var(--color-success-accent); }
-.dot-warning { background: var(--color-brand-coral); }
-.dot-danger { background: var(--color-brand-red-dark); }
-.dot-muted { background: var(--color-stone); }
+.inr-status { display: flex; flex-direction: column; gap: var(--spacing-xxs); align-items: center; }
+.inr-label { color: var(--color-slate); text-align: center; }
+.badge { display: flex; align-items: center; justify-content: center; }
 </style>

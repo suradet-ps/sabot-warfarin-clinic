@@ -125,26 +125,34 @@ async function fetchSuggestion() {
       targetHigh: targetHigh.value,
     })
     if (suggestion.value) {
-      newDoseMgday.value = suggestion.value.suggestedDoseMgday
+      const suggestedDaily = suggestion.value.suggestedDoseMgday
 
-      const weeklyDose = suggestion.value.suggestedDoseMgday * 7
-      const daysUntilAppointment = nextAppointment.value
-        ? Math.max(1, Math.ceil((new Date(nextAppointment.value).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-        : 28
-      const startDayOfWeek = new Date().getDay()
+      if (suggestedDaily === currentDoseMgday.value) {
+        newDoseMgday.value = suggestedDaily
+        doseOptionsError.value = 'ขนาดยาคงที่ (หลังปัดเศษ) - ไม่ต้องปรับยา'
+        doseOptions.value = []
+      } else {
+        newDoseMgday.value = suggestedDaily
 
-      const options = await generateDoseOptions(
-        weeklyDose,
-        availablePills.value,
-        allowHalf.value,
-        specialDayPattern.value,
-        daysUntilAppointment,
-        startDayOfWeek
-      )
-      doseOptions.value = options
+        const weeklyDose = suggestedDaily * 7
+        const daysUntilAppointment = nextAppointment.value
+          ? Math.max(1, Math.ceil((new Date(nextAppointment.value).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+          : 28
+        const startDayOfWeek = new Date().getDay()
 
-      if (options.length === 0) {
-        doseOptionsError.value = 'ไม่พบตัวเลือกที่เหมาะสม ลองปรับการตั้งค่ายา'
+        const options = await generateDoseOptions(
+          weeklyDose,
+          availablePills.value,
+          allowHalf.value,
+          specialDayPattern.value,
+          daysUntilAppointment,
+          startDayOfWeek
+        )
+        doseOptions.value = options
+
+        if (options.length === 0) {
+          doseOptionsError.value = 'ไม่พบตัวเลือกที่เหมาะสม ลองปรับการตั้งค่ายา'
+        }
       }
     }
   } catch (e) {
@@ -273,7 +281,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
               {{ loadingSuggestion ? 'กำลังคำนวณ...' : 'คำนวณขนาดยา' }}
             </button>
             <span v-if="suggestion" class="body-sm">
-              แนะนำ: <strong>{{ suggestion.suggestedDoseMgday.toFixed(1) }} mg/วัน</strong> &mdash; {{ suggestion.recommendation }}
+              แนะนำ: <strong>{{ (suggestion.suggestedDoseMgday * 7).toFixed(1) }} mg/สัปดาห์</strong> ({{ suggestion.suggestedDoseMgday.toFixed(1) }} mg/วัน) &mdash; {{ suggestion.recommendation }}
             </span>
           </div>
 
