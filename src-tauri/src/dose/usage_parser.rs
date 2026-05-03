@@ -1,10 +1,7 @@
 use regex::Regex;
 use std::collections::BTreeSet;
 
-use crate::models::{
-  dispensing::ParsedDoseInfo,
-  visit::DoseSchedule,
-};
+use crate::models::{dispensing::ParsedDoseInfo, visit::DoseSchedule};
 
 #[derive(Debug, Clone)]
 pub struct ParsedUsageResult {
@@ -68,7 +65,9 @@ pub fn parse_dispensing_usage(strength: &str, usage_text: &str) -> ParsedUsageRe
 fn extract_strength_mg(strength: &str) -> Option<f64> {
   let re = Regex::new(r"(?i)(\d+(?:\.\d+)?)\s*mg").expect("valid regex");
   if let Some(captures) = re.captures(strength) {
-    return captures.get(1).and_then(|value| value.as_str().parse::<f64>().ok());
+    return captures
+      .get(1)
+      .and_then(|value| value.as_str().parse::<f64>().ok());
   }
 
   let any_number = Regex::new(r"(\d+(?:\.\d+)?)").expect("valid regex");
@@ -88,12 +87,11 @@ fn extract_tablet_amount(normalized: &str) -> Option<f64> {
     }
   }
 
-  let tablet_re = Regex::new(
-    r"(?i)(\d+(?:\.\d+)?)\s*(?:tab(?:let)?s?|เม็ด)",
-  )
-  .expect("valid regex");
+  let tablet_re = Regex::new(r"(?i)(\d+(?:\.\d+)?)\s*(?:tab(?:let)?s?|เม็ด)").expect("valid regex");
   if let Some(captures) = tablet_re.captures(normalized) {
-    return captures.get(1).and_then(|value| value.as_str().parse::<f64>().ok());
+    return captures
+      .get(1)
+      .and_then(|value| value.as_str().parse::<f64>().ok());
   }
 
   let number_re = Regex::new(r"(?i)(\d+(?:\.\d+)?)").expect("valid regex");
@@ -166,13 +164,13 @@ fn collect_explicit_day_indexes(tokens: &[String]) -> Vec<usize> {
 
     if let Some((connector_index, end_day_index, end_day)) = find_day_range(tokens, index)
       && (connector_index == index + 1 || is_filler_token(&tokens[index + 1]))
-      {
-        for day in expand_day_range(current_day, end_day) {
-          matched_days.insert(day);
-        }
-        index = end_day_index + 1;
-        continue;
+    {
+      for day in expand_day_range(current_day, end_day) {
+        matched_days.insert(day);
       }
+      index = end_day_index + 1;
+      continue;
+    }
 
     matched_days.insert(current_day);
     index += 1;
@@ -288,10 +286,7 @@ fn normalize_usage_text(input: &str) -> String {
 
   text = filler_dots_re.replace_all(&text, " ").into_owned();
 
-  text
-    .split_whitespace()
-    .collect::<Vec<_>>()
-    .join(" ")
+  text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn tokenize_usage(normalized: &str) -> Vec<String> {
@@ -330,7 +325,14 @@ fn is_range_connector(token: &str) -> bool {
 fn is_filler_token(token: &str) -> bool {
   matches!(
     token,
-    "วัน" | "เฉพาะ" | "เฉพาะวัน" | "เฉพาะวันที่" | "ก่อนนอน" | "ครั้ง" | "ครั้งละ" | "วันละ"
+    "วัน"
+      | "เฉพาะ"
+      | "เฉพาะวัน"
+      | "เฉพาะวันที่"
+      | "ก่อนนอน"
+      | "ครั้ง"
+      | "ครั้งละ"
+      | "วันละ"
   )
 }
 
@@ -462,18 +464,12 @@ mod tests {
 
   #[test]
   fn combines_split_weekly_regimen_correctly() {
-    let weekday = parse_dispensing_usage(
-      "3 mg",
-      "ใช้ตามแพทย์สั่ง กิน 1 เม็ด ก่อนนอน วันจันทร์ ถึง วันศุกร์",
-    )
-    .dose
-    .expect("weekday dose");
-    let saturday = parse_dispensing_usage(
-      "3 mg",
-      "ใช้ตามแพทย์สั่ง กิน ครึ่งเม็ด ก่อนนอน วันเสาร์",
-    )
-    .dose
-    .expect("saturday dose");
+    let weekday = parse_dispensing_usage("3 mg", "ใช้ตามแพทย์สั่ง กิน 1 เม็ด ก่อนนอน วันจันทร์ ถึง วันศุกร์")
+      .dose
+      .expect("weekday dose");
+    let saturday = parse_dispensing_usage("3 mg", "ใช้ตามแพทย์สั่ง กิน ครึ่งเม็ด ก่อนนอน วันเสาร์")
+      .dose
+      .expect("saturday dose");
 
     assert_eq!(weekday.mg_per_week + saturday.mg_per_week, 16.5);
   }

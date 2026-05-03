@@ -1,11 +1,11 @@
 //! TTR report command.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::State;
 
 use crate::{
   commands::patients::get_inr_records,
-  db::sqlite::{get_active_patients, get_outcomes, AppState},
+  db::sqlite::{AppState, get_active_patients, get_outcomes},
   dose::calculator::calculate_ttr as calc_ttr,
 };
 

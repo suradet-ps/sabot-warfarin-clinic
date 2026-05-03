@@ -4,7 +4,7 @@ use tauri::State;
 
 use crate::{
   db::sqlite::{
-    get_appointments as db_get_appointments, schedule_appointment as db_schedule, AppState,
+    AppState, get_appointments as db_get_appointments, schedule_appointment as db_schedule,
   },
   models::appointment::AppointmentInput,
 };

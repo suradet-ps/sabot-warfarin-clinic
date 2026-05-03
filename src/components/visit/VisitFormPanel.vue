@@ -398,7 +398,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
         <div class="panel-footer">
           <button class="btn btn-ghost" @click="modelValue = false">ยกเลิก</button>
           <button class="btn btn-primary" @click="handleSubmit" :disabled="saving">
-            {{ saving ? 'กำลังบันทึก...' : 'บันทึก' }}
+            {{ saving ? 'กำลังบันทึก...' : 'บันทึก & เปิดใบพิมพ์' }}
           </button>
         </div>
       </div>

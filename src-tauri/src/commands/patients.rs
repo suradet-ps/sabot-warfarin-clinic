@@ -1,14 +1,15 @@
 //! Patient management commands — enroll, list, detail, status change.
 
+use chrono::Utc;
 use tauri::State;
 
 use crate::{
   db::{
-    mysql::{get_dispensing_history, get_hosxp_patient, DbConfig},
+    mysql::{DbConfig, get_dispensing_history, get_hosxp_patient},
     sqlite::{
-      enroll_patient as db_enroll, get_active_patients as db_get_active, get_inr_from_visits,
-      get_patient_by_hn, get_pending_appointments, get_setting, get_visit_history,
-      update_patient_status as db_update_status, AppState,
+      AppState, enroll_patient as db_enroll, get_active_patients as db_get_active,
+      get_inr_from_visits, get_patient_by_hn, get_pending_appointments, get_setting,
+      get_visit_history, update_patient_status as db_update_status,
     },
   },
   dose::calculator::calculate_ttr,
@@ -57,6 +58,7 @@ pub async fn get_active_patient_summaries(
   let appointments = get_pending_appointments(&state.pool)
     .await
     .unwrap_or_default();
+  let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
 
   let mut summaries = Vec::with_capacity(patients.len());
   for patient in patients {
@@ -83,10 +85,7 @@ pub async fn get_active_patient_summaries(
       .into_iter()
       .next()
       .and_then(|visit| visit.new_dose_mgday.or(visit.current_dose_mgday));
-    let next_appointment = appointments
-      .iter()
-      .find(|appointment| appointment.hn == patient.hn)
-      .map(|appointment| appointment.appt_date.clone());
+    let next_appointment = find_next_appointment(&appointments, &patient.hn, &today);
 
     summaries.push(ActivePatientSummary {
       hosxp_info: hosxp_map
@@ -167,10 +166,8 @@ pub async fn get_patient_detail(
   let appointments = get_pending_appointments(&state.pool)
     .await
     .unwrap_or_default();
-  let next_appt = appointments
-    .iter()
-    .find(|a| a.hn == hn)
-    .map(|a| a.appt_date.clone());
+  let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
+  let next_appt = find_next_appointment(&appointments, &hn, &today);
 
   Ok(PatientDetail {
     patient,
@@ -200,8 +197,8 @@ pub async fn update_patient_status(
     Some(reason.as_str()),
     effective_date.as_deref(),
   )
-    .await
-    .map_err(|e| e.to_string())
+  .await
+  .map_err(|e| e.to_string())
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -217,9 +214,9 @@ async fn try_get_hosxp_patient(state: &AppState, hn: &str) -> HosxpPatient {
 
   if let Some(config) = config_result
     && let Ok(Some(info)) = get_hosxp_patient(&config, hn).await
-    {
-      return info;
-    }
+  {
+    return info;
+  }
 
   HosxpPatient {
     hn: hn.to_string(),
@@ -245,9 +242,9 @@ async fn try_get_dispensing_history(
 
   if let Some(config) = config_result
     && let Ok(records) = get_dispensing_history(&config, hn).await
-    {
-      return records;
-    }
+  {
+    return records;
+  }
 
   Vec::new()
 }
@@ -264,11 +261,22 @@ pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord
   if let Some(config) = config_result
     && let Ok(records) = crate::db::mysql::get_inr_history(&config, hn).await
     && !records.is_empty()
-    {
-      return records;
-    }
+  {
+    return records;
+  }
 
   get_inr_from_visits(&state.pool, hn)
     .await
     .unwrap_or_default()
+}
+
+fn find_next_appointment(
+  appointments: &[crate::models::appointment::WfAppointment],
+  hn: &str,
+  today: &str,
+) -> Option<String> {
+  appointments
+    .iter()
+    .find(|appointment| appointment.hn == hn && appointment.appt_date.as_str() >= today)
+    .map(|appointment| appointment.appt_date.clone())
 }

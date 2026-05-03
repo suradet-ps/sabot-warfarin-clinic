@@ -5,8 +5,8 @@ use std::collections::HashMap;
 use tauri::State;
 
 use crate::db::{
-  mysql::{test_mysql_connection as db_test_connection, DbConfig},
-  sqlite::{get_all_settings, get_setting, set_setting, AppState},
+  mysql::{DbConfig, test_mysql_connection as db_test_connection},
+  sqlite::{AppState, get_all_settings, get_setting, set_setting},
 };
 
 #[tauri::command]

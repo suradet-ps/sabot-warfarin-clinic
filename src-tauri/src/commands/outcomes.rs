@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::{
   db::sqlite::{
-    get_outcomes as db_get_outcomes, record_adverse_event as db_record_outcome, AppState,
+    AppState, get_outcomes as db_get_outcomes, record_adverse_event as db_record_outcome,
   },
   models::outcome::{OutcomeInput, WfOutcome},
 };

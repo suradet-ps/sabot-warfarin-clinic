@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useRoute } from 'vue-router'
 import { Printer } from 'lucide-vue-next'
@@ -17,8 +17,20 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 async function loadSlip() {
+  if (!Number.isInteger(visitId.value) || visitId.value <= 0) {
+    visit.value = null
+    patient.value = null
+    ttr.value = null
+    error.value = 'visit id ไม่ถูกต้อง'
+    loading.value = false
+    return
+  }
+
   loading.value = true
   error.value = null
+  visit.value = null
+  patient.value = null
+  ttr.value = null
   try {
     visit.value = await invoke<WfVisit>('get_visit_by_id', { visitId: visitId.value })
     const [patientDetail, inrHistory, ttrValue] = await Promise.all([
@@ -39,9 +51,9 @@ function printSlip() {
   window.print()
 }
 
-onMounted(() => {
+watch(visitId, () => {
   void loadSlip()
-})
+}, { immediate: true })
 </script>
 
 <template>

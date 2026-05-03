@@ -37,6 +37,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const visitPanelOpen = ref(false)
 const statusModalOpen = ref(false)
+const appointmentTimelineKey = ref(0)
 
 async function loadPatient() {
   loading.value = true
@@ -61,12 +62,14 @@ const age = computed(() => calculateAge(patientDetail.value?.hosxpInfo?.birthday
 const fullName = computed(() => patientFullName(patientDetail.value?.hosxpInfo))
 
 async function onVisitSaved(visitId: number) {
-  await loadPatient()
+  visitPanelOpen.value = false
+  await router.push(`/slip/${visitId}`)
 }
 
 async function refreshVisits() {
   const visitList = await invoke<WfVisit[]>('get_visit_history', { hn })
   visits.value = visitList
+  appointmentTimelineKey.value += 1
 }
 
 onMounted(() => { void loadPatient() })
@@ -158,7 +161,7 @@ onMounted(() => { void loadPatient() })
           :records="patientDetail.dispensingHistory ?? []"
         />
 
-        <AppointmentTimeline v-else-if="activeTab === 'appointments'" :hn="hn" />
+        <AppointmentTimeline v-else-if="activeTab === 'appointments'" :key="appointmentTimelineKey" :hn="hn" />
 
         <AdverseEventList v-else-if="activeTab === 'adverse'" :hn="hn" />
       </div>

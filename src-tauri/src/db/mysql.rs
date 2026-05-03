@@ -6,21 +6,21 @@
 //! Runtime queries (`sqlx::query()`) are used throughout because the HosXP
 //! MySQL server is only available at runtime, never at compile time.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{Duration, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{
-  mysql::{MySqlPoolOptions, MySqlRow},
   MySql, QueryBuilder, Row,
+  mysql::{MySqlPoolOptions, MySqlRow},
 };
 use std::collections::{HashMap, HashSet};
 
+use crate::dose::usage_parser::parse_dispensing_usage;
 use crate::models::{
   dispensing::DispensingRecord,
   inr::InrRecord,
   patient::{HosxpPatient, PatientDrugRecord, SearchFilters, SearchResponse},
 };
-use crate::dose::usage_parser::parse_dispensing_usage;
 
 /// Warfarin drug item codes at Sarabosot Hospital.
 pub const WARFARIN_ICODES: [&str; 3] = ["1600014", "1600013", "1600024"];
@@ -585,9 +585,8 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
   .await
   {
     Ok(rows) => rows,
-    Err(_) => {
-      sqlx::query(
-    r#"
+    Err(_) => sqlx::query(
+      r#"
         SELECT
           o.hn,
           o.vn,
@@ -607,12 +606,11 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
           AND o.icode IN ('1600014', '1600013', '1600024')
         ORDER BY o.vstdate DESC, o.vn DESC, o.icode
         "#,
-      )
-      .bind(hn)
-      .fetch_all(&pool)
-      .await
-      .context("failed to query warfarin dispensing history")?
-    }
+    )
+    .bind(hn)
+    .fetch_all(&pool)
+    .await
+    .context("failed to query warfarin dispensing history")?,
   };
 
   Ok(

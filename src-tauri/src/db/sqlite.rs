@@ -3,9 +3,9 @@
 //! Uses runtime queries (`sqlx::query()`) throughout so no DATABASE_URL is
 //! needed at compile time. All public functions return `anyhow::Result`.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{Datelike, Utc};
-use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
+use sqlx::{Row, Sqlite, SqlitePool, Transaction, sqlite::SqlitePoolOptions};
 use std::path::PathBuf;
 
 use crate::models::{
@@ -30,7 +30,15 @@ fn calculate_pills_summary(
     return None;
   }
 
-  let day_doses = [schedule.mon, schedule.tue, schedule.wed, schedule.thu, schedule.fri, schedule.sat, schedule.sun];
+  let day_doses = [
+    schedule.mon,
+    schedule.tue,
+    schedule.wed,
+    schedule.thu,
+    schedule.fri,
+    schedule.sat,
+    schedule.sun,
+  ];
 
   let mut pill_counts: std::collections::HashMap<u8, (u32, u32)> = std::collections::HashMap::new();
 
@@ -44,12 +52,24 @@ fn calculate_pills_summary(
       let has_half = (dose - dose.floor()) >= 0.5;
 
       for _ in 0..whole {
-        let mg = if dose >= 5.0 { 5 } else if dose >= 3.0 { 3 } else { 2 };
+        let mg = if dose >= 5.0 {
+          5
+        } else if dose >= 3.0 {
+          3
+        } else {
+          2
+        };
         let entry = pill_counts.entry(mg).or_insert((0, 0));
         entry.0 += 1;
       }
       if has_half {
-        let mg = if dose >= 2.5 { 5 } else if dose >= 1.5 { 3 } else { 2 };
+        let mg = if dose >= 2.5 {
+          5
+        } else if dose >= 1.5 {
+          3
+        } else {
+          2
+        };
         let entry = pill_counts.entry(mg).or_insert((0, 0));
         entry.1 += 1;
       }
@@ -62,9 +82,17 @@ fn calculate_pills_summary(
     .map(|(mg, (dispensed, half))| {
       let usage_note = format!(
         "ใช้ {} ยา {} มก. รวม {} เม็ด (ครึ่งเม็ด {} เม็ด)",
-        if days >= 28 { "รายสัปดาห์" } else { "รายวัน" },
+        if days >= 28 {
+          "รายสัปดาห์"
+        } else {
+          "รายวัน"
+        },
         mg,
-        if half > 0 { format!("{}+{}", dispensed, half) } else { dispensed.to_string() },
+        if half > 0 {
+          format!("{}+{}", dispensed, half)
+        } else {
+          dispensed.to_string()
+        },
         half
       );
       crate::models::visit::PillLineSummary {
@@ -75,7 +103,7 @@ fn calculate_pills_summary(
     })
     .collect();
 
-if lines.is_empty() {
+  if lines.is_empty() {
     return None;
   }
 
@@ -330,13 +358,18 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
     .map(|option| serde_json::to_string(option).unwrap_or_default());
   let dose_changed = i32::from(input.dose_changed);
 
+  let mut tx = pool
+    .begin()
+    .await
+    .context("failed to begin visit save transaction")?;
+
   let id = sqlx::query(
     "INSERT INTO wf_visits \
          (hn, visit_date, inr_value, inr_source, \
-          current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
-          dose_changed, next_appointment, next_inr_due, \
-          physician, notes, side_effects, adherence, created_by, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+           current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
+           dose_changed, next_appointment, next_inr_due, \
+           physician, notes, side_effects, adherence, created_by, created_at) \
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&input.hn)
   .bind(&input.visit_date)
@@ -357,10 +390,16 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
   .bind(&input.adherence)
   .bind(&input.created_by)
   .bind(&now)
-  .execute(pool)
+  .execute(&mut *tx)
   .await
   .context("failed to save visit")?
   .last_insert_rowid();
+
+  sync_visit_appointment(&mut tx, input, id, &now).await?;
+
+  tx.commit()
+    .await
+    .context("failed to commit visit save transaction")?;
 
   Ok(id)
 }
@@ -486,7 +525,9 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       .as_ref()
       .map(selected_option_summary)
       .or_else(|| {
-        if let (Some(vd), Some(na), Some(nd)) = (Some(&visit_date_str), &next_appt_str, &new_dose_detail) {
+        if let (Some(vd), Some(na), Some(nd)) =
+          (Some(&visit_date_str), &next_appt_str, &new_dose_detail)
+        {
           calculate_pills_summary(vd, nd, na)
         } else {
           None
@@ -553,11 +594,115 @@ pub async fn get_inr_from_visits(pool: &SqlitePool, hn: &str) -> Result<Vec<InrR
 
 /// Deletes a visit record by ID.
 pub async fn delete_visit(pool: &SqlitePool, visit_id: i64) -> Result<()> {
+  let mut tx = pool
+    .begin()
+    .await
+    .context("failed to begin visit delete transaction")?;
+
+  unlink_or_delete_visit_appointment(&mut tx, visit_id).await?;
+
   sqlx::query("DELETE FROM wf_visits WHERE id = ?")
     .bind(visit_id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .context("failed to delete visit")?;
+
+  tx.commit()
+    .await
+    .context("failed to commit visit delete transaction")?;
+
+  Ok(())
+}
+
+async fn sync_visit_appointment(
+  tx: &mut Transaction<'_, Sqlite>,
+  input: &VisitInput,
+  visit_id: i64,
+  now: &str,
+) -> Result<()> {
+  let Some(next_appointment) = input
+    .next_appointment
+    .as_deref()
+    .map(str::trim)
+    .filter(|value| !value.is_empty())
+  else {
+    return Ok(());
+  };
+
+  let existing_manual_appointment_id = sqlx::query_scalar::<_, i64>(
+    "SELECT id FROM wf_appointments \
+         WHERE hn = ? AND appt_date = ? AND status = 'scheduled' AND source_visit_id IS NULL \
+         ORDER BY id DESC LIMIT 1",
+  )
+  .bind(&input.hn)
+  .bind(next_appointment)
+  .fetch_optional(&mut **tx)
+  .await
+  .context("failed to find reusable appointment for visit")?;
+
+  if let Some(appointment_id) = existing_manual_appointment_id {
+    sqlx::query(
+      "UPDATE wf_appointments \
+           SET source_visit_id = ?, \
+               appt_type = COALESCE(appt_type, 'clinic_visit') \
+           WHERE id = ?",
+    )
+    .bind(visit_id)
+    .bind(appointment_id)
+    .execute(&mut **tx)
+    .await
+    .context("failed to link existing appointment to visit")?;
+  } else {
+    sqlx::query(
+      "INSERT INTO wf_appointments \
+           (hn, appt_date, appt_type, status, notes, created_at, source_visit_id, generated_from_visit) \
+           VALUES (?, ?, 'clinic_visit', 'scheduled', NULL, ?, ?, 1)",
+    )
+    .bind(&input.hn)
+    .bind(next_appointment)
+    .bind(now)
+    .bind(visit_id)
+    .execute(&mut **tx)
+    .await
+    .context("failed to create linked appointment for visit")?;
+  }
+
+  Ok(())
+}
+
+async fn unlink_or_delete_visit_appointment(
+  tx: &mut Transaction<'_, Sqlite>,
+  visit_id: i64,
+) -> Result<()> {
+  let linked_appointment = sqlx::query(
+    "SELECT id, generated_from_visit FROM wf_appointments WHERE source_visit_id = ? LIMIT 1",
+  )
+  .bind(visit_id)
+  .fetch_optional(&mut **tx)
+  .await
+  .context("failed to query linked appointment for visit")?;
+
+  let Some(appointment) = linked_appointment else {
+    return Ok(());
+  };
+
+  let appointment_id: i64 = appointment.get("id");
+  let generated_from_visit: i32 = appointment.try_get("generated_from_visit").unwrap_or(0);
+
+  if generated_from_visit != 0 {
+    sqlx::query("DELETE FROM wf_appointments WHERE id = ?")
+      .bind(appointment_id)
+      .execute(&mut **tx)
+      .await
+      .context("failed to delete auto-generated appointment for visit")?;
+  } else {
+    sqlx::query("UPDATE wf_appointments SET source_visit_id = NULL WHERE id = ?")
+      .bind(appointment_id)
+      .execute(&mut **tx)
+      .await
+      .context("failed to unlink manual appointment from visit")?;
+  }
+
   Ok(())
 }
 

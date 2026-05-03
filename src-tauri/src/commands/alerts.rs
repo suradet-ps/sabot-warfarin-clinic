@@ -5,7 +5,7 @@ use tauri::State;
 
 use crate::{
   commands::patients::get_inr_records,
-  db::sqlite::{get_active_patients, get_pending_appointments, AppState},
+  db::sqlite::{AppState, get_active_patients, get_pending_appointments},
   dose::calculator::calculate_ttr,
   models::alert::PatientAlert,
 };
@@ -133,22 +133,22 @@ pub async fn get_patient_alerts(state: State<'_, AppState>) -> Result<Vec<Patien
       .map(|r| (r.date.clone(), r.value))
       .collect();
     if let Some(ttr) = calculate_ttr(
-        &inr_pairs,
-        patient.target_inr_low,
-        patient.target_inr_high,
-        182,
-      ) && ttr < TTR_RED_THRESHOLD
-      {
-        alerts.push(PatientAlert {
-          hn: patient.hn.clone(),
-          patient_name: display_name.clone(),
-          alert_type: "low_ttr".to_string(),
-          severity: "critical".to_string(),
-          message: format!("TTR ต่ำ {ttr:.0}% (เกณฑ์ ≥ 65%)"),
-          value: Some(ttr),
-          date: None,
-        });
-      }
+      &inr_pairs,
+      patient.target_inr_low,
+      patient.target_inr_high,
+      182,
+    ) && ttr < TTR_RED_THRESHOLD
+    {
+      alerts.push(PatientAlert {
+        hn: patient.hn.clone(),
+        patient_name: display_name.clone(),
+        alert_type: "low_ttr".to_string(),
+        severity: "critical".to_string(),
+        message: format!("TTR ต่ำ {ttr:.0}% (เกณฑ์ ≥ 65%)"),
+        value: Some(ttr),
+        date: None,
+      });
+    }
 
     // ── Missed appointment ─────────────────────────────────────────────
     for appt in pending_appts
