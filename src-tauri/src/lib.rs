@@ -16,7 +16,7 @@ use commands::{
   reports::{calculate_clinic_ttr, calculate_ttr, get_report_data},
   screening::search_warfarin_patients,
   settings::{get_setting_value, get_settings, save_setting, test_mysql_connection},
-  visits::{get_visit_by_id, get_visit_history, save_visit, suggest_dose},
+  visits::{delete_visit, get_visit_by_id, get_visit_history, save_visit, suggest_dose},
 };
 use db::sqlite::{init_pool, AppState};
 use tauri::{App, Manager};
@@ -53,6 +53,7 @@ pub fn run() -> tauri::Result<()> {
       get_visit_history,
       get_visit_by_id,
       save_visit,
+      delete_visit,
       suggest_dose,
       get_patient_alerts,
       get_outcomes,

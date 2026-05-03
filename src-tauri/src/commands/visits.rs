@@ -4,8 +4,8 @@ use tauri::State;
 
 use crate::{
   db::sqlite::{
-    get_visit_by_id as db_get_visit_by_id, get_visit_history as db_history, save_visit as db_save,
-    AppState,
+    delete_visit as db_delete_visit, get_visit_by_id as db_get_visit_by_id,
+    get_visit_history as db_history, save_visit as db_save, AppState,
   },
   dose::calculator::suggest_dose as suggest_dose_impl,
   models::visit::{DoseSuggestion, VisitInput, WfVisit},
@@ -49,4 +49,11 @@ pub async fn suggest_dose(
     target_low,
     target_high,
   ))
+}
+
+#[tauri::command]
+pub async fn delete_visit(visit_id: i64, state: State<'_, AppState>) -> Result<(), String> {
+  db_delete_visit(&state.pool, visit_id)
+    .await
+    .map_err(|e| e.to_string())
 }

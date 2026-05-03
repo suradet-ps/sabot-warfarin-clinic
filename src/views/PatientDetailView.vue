@@ -62,7 +62,11 @@ const fullName = computed(() => patientFullName(patientDetail.value?.hosxpInfo))
 
 async function onVisitSaved(visitId: number) {
   await loadPatient()
-  void router.push(`/slip/${visitId}`)
+}
+
+async function refreshVisits() {
+  const visitList = await invoke<WfVisit[]>('get_visit_history', { hn })
+  visits.value = visitList
 }
 
 onMounted(() => { void loadPatient() })
@@ -147,7 +151,7 @@ onMounted(() => { void loadPatient() })
           />
         </template>
 
-        <VisitList v-else-if="activeTab === 'visits'" :visits="visits" :hn="hn" />
+        <VisitList v-else-if="activeTab === 'visits'" :visits="visits" :hn="hn" @deleted="refreshVisits" />
 
         <DispensingTable
           v-else-if="activeTab === 'dispensing'"

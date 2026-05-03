@@ -23,6 +23,11 @@ export const useVisitStore = defineStore('visit', () => {
     return id
   }
 
+  async function deleteVisit(visitId: number, hn: string) {
+    await invoke('delete_visit', { visitId })
+    await fetchVisits(hn)
+  }
+
   async function getSuggestion(currentDose: number, currentInr: number, targetLow: number, targetHigh: number) {
     currentSuggestion.value = await invoke<DoseSuggestion>('suggest_dose', {
       currentDose,
@@ -32,5 +37,5 @@ export const useVisitStore = defineStore('visit', () => {
     })
   }
 
-  return { visits, currentSuggestion, loading, fetchVisits, saveVisit, getSuggestion }
+  return { visits, currentSuggestion, loading, fetchVisits, saveVisit, deleteVisit, getSuggestion }
 })

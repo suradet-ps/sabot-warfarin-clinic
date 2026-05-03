@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, ChevronUp } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next'
 import type { WfVisit } from '#/types/visit'
 import { formatThaiDate, normalizeDoseSchedule, doseDayLabels, doseDayKeys } from '#/utils/clinic'
+import { useVisitStore } from '#/stores/visit'
+import ConfirmDialog from '#/components/shared/ConfirmDialog.vue'
 
 const props = defineProps<{ visits: WfVisit[]; hn: string }>()
+const visitStore = useVisitStore()
+const emit = defineEmits<{ (e: 'deleted'): void }>()
 
 const expandedIds = ref<Set<number>>(new Set())
+const deleteTargetId = ref<number | null>(null)
 
 const sortedVisits = computed(() =>
   [...props.visits].sort((a, b) => `${b.visitDate}`.localeCompare(`${a.visitDate}`)),
@@ -18,6 +23,21 @@ function toggleExpand(id: number) {
   } else {
     expandedIds.value.add(id)
   }
+}
+
+function confirmDelete(id: number) {
+  deleteTargetId.value = id
+}
+
+async function handleConfirmedDelete() {
+  if (deleteTargetId.value === null) return
+  await visitStore.deleteVisit(deleteTargetId.value, props.hn)
+  deleteTargetId.value = null
+  emit('deleted')
+}
+
+function handleCancelDelete() {
+  deleteTargetId.value = null
 }
 
 const adherenceLabels: Record<string, string> = {
@@ -48,7 +68,12 @@ function adherenceBadgeClass(a?: string | null) {
             {{ adherenceLabels[v.adherence] ?? v.adherence }}
           </span>
         </div>
-        <component :is="expandedIds.has(v.id) ? ChevronUp : ChevronDown" :size="16" style="color: var(--color-slate); flex-shrink: 0" />
+        <div class="visit-actions">
+          <button class="btn-icon" title="ลบ" @click.stop="confirmDelete(v.id)">
+            <Trash2 :size="14" />
+          </button>
+          <component :is="expandedIds.has(v.id) ? ChevronUp : ChevronDown" :size="16" style="color: var(--color-slate); flex-shrink: 0" />
+        </div>
       </div>
 
       <div v-if="expandedIds.has(v.id)" class="visit-detail">
@@ -80,6 +105,15 @@ function adherenceBadgeClass(a?: string | null) {
       </div>
     </div>
   </div>
+
+  <ConfirmDialog
+    v-if="deleteTargetId !== null"
+    title="ยืนยันการลบ"
+    message="คุณต้องการลบประวัติการทำคลินิกนี้ใช่หรือไม่? การลบจะไม่สามารถกู้คืนได้"
+    confirm-label="ลบ"
+    @confirm="handleConfirmedDelete"
+    @cancel="handleCancelDelete"
+  />
 </template>
 
 <style scoped>
@@ -87,6 +121,19 @@ function adherenceBadgeClass(a?: string | null) {
 .visit-item { padding: var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .visit-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; gap: var(--spacing-sm); }
 .visit-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+.visit-actions { display: flex; align-items: center; gap: var(--spacing-xs); }
+.btn-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--rounded-full);
+  background: transparent;
+  color: var(--color-slate);
+  cursor: pointer;
+}
+.btn-icon:hover { background: var(--color-surface); color: var(--color-brand-red); }
 .visit-detail { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: 1px solid var(--color-hairline-soft); }
 .detail-row { display: flex; gap: var(--spacing-sm); align-items: flex-start; }
 .dose-mini-grid { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }

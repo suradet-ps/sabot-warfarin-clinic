@@ -551,6 +551,16 @@ pub async fn get_inr_from_visits(pool: &SqlitePool, hn: &str) -> Result<Vec<InrR
   )
 }
 
+/// Deletes a visit record by ID.
+pub async fn delete_visit(pool: &SqlitePool, visit_id: i64) -> Result<()> {
+  sqlx::query("DELETE FROM wf_visits WHERE id = ?")
+    .bind(visit_id)
+    .execute(pool)
+    .await
+    .context("failed to delete visit")?;
+  Ok(())
+}
+
 // wf_appointments
 
 /// Inserts a new appointment and returns the new row ID.
