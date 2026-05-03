@@ -1,107 +1,124 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '#/stores/settings'
 import RegimenOptionCard from '#/components/visit/RegimenOptionCard.vue'
 import type { PatientDetail } from '#/types/patient'
 import type { WfVisit } from '#/types/visit'
 import { calculateAge, doseDayKeys, doseDayLabels, formatThaiDate, normalizeDoseSchedule, scheduleWeeklyTotal, scheduleAverageDose } from '#/utils/clinic'
 import { createRegimenOptionSnapshot } from '#/utils/regimen'
-import { createChart, LineSeries } from 'lightweight-charts'
 
 const props = defineProps<{ visit: WfVisit; patient: PatientDetail; ttr: number | null }>()
 
 const settingsStore = useSettingsStore()
 const hospitalName = ref('โรงพยาบาลสระโบสถ์')
-const chartContainer = ref<HTMLElement | null>(null)
-let chart: ReturnType<typeof createChart> | null = null
 
-onMounted(async () => {
-  await settingsStore.loadSettings()
+settingsStore.loadSettings().then(() => {
   hospitalName.value = settingsStore.hospitalName || hospitalName.value
-  await nextTick()
-  renderChart()
 })
 
-watch(() => props.patient.inrHistory, () => {
-  renderChart()
-}, { deep: true })
+const CHART_WIDTH = 400
+const CHART_HEIGHT = 160
+const PADDING = { top: 12, right: 32, bottom: 24, left: 12 }
 
-function renderChart() {
-  if (!chartContainer.value) return
-  if (chart) {
-    chart.remove()
-    chart = null
-  }
+type ChartPoint = { date: string; value: number; x: number; y: number }
 
-  const inrData = [...(props.patient.inrHistory ?? [])]
+const inrRecords = computed(() => {
+  return [...(props.patient.inrHistory ?? [])]
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-12)
+})
 
-  if (inrData.length === 0) return
-
-  chart = createChart(chartContainer.value, {
-    width: chartContainer.value.clientWidth,
-    height: 180,
-    layout: {
-      background: { color: 'transparent' },
-      textColor: '#5a5a72',
-    },
-    grid: {
-      vertLines: { color: '#f0f0f1' },
-      horzLines: { color: '#f0f0f1' },
-    },
-    timeScale: {
-      timeVisible: true,
-      borderColor: '#e5e5e6',
-    },
-    rightPriceScale: {
-      borderColor: '#e5e5e6',
-    },
-    crosshair: {
-      mode: 0,
-    },
-  })
-
-  const lineSeries = chart.addSeries(LineSeries, {
-    color: '#1a6fff',
-    lineWidth: 2,
-    crosshairMarkerVisible: true,
-  })
-
-  const data = inrData.map((r, i) => ({
-    time: r.date as unknown as string,
-    value: r.value,
-  }))
-
-  lineSeries.setData(data)
-
+const valueRange = computed(() => {
+  const values = inrRecords.value.map(r => r.value)
+  if (!values.length) return null
   const targetLow = props.patient.patient.targetInrLow
   const targetHigh = props.patient.patient.targetInrHigh
+  const rawMin = Math.min(...values, targetLow, targetHigh)
+  const rawMax = Math.max(...values, targetLow, targetHigh)
+  const min = Math.max(0, Math.floor((rawMin - 0.4) * 2) / 2)
+  const max = Math.ceil((rawMax + 0.4) * 2) / 2
+  return { min, max: max === min ? max + 1 : max }
+})
 
-  if (targetLow > 0) {
-    const lowLine = chart.addSeries(LineSeries, {
-      color: '#00a878',
-      lineWidth: 1,
-      lineStyle: 2,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-    })
-    lowLine.setData(data.map(d => ({ time: d.time, value: targetLow })))
-  }
+const plotWidth = CHART_WIDTH - PADDING.left - PADDING.right
+const plotHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom
 
-  if (targetHigh > 0) {
-    const highLine = chart.addSeries(LineSeries, {
-      color: '#00a878',
-      lineWidth: 1,
-      lineStyle: 2,
-      priceLineVisible: false,
-      crosshairMarkerVisible: false,
-    })
-    highLine.setData(data.map(d => ({ time: d.time, value: targetHigh })))
-  }
-
-  chart.timeScale().fitContent()
+function xForDate(date: string): number {
+  const first = inrRecords.value[0]
+  const last = inrRecords.value[inrRecords.value.length - 1]
+  if (!first || !last) return PADDING.left
+  const firstTime = new Date(first.date).getTime()
+  const lastTime = new Date(last.date).getTime()
+  const currentTime = new Date(date).getTime()
+  const span = Math.max(lastTime - firstTime, 1)
+  return PADDING.left + ((currentTime - firstTime) / span) * plotWidth
 }
+
+function yForValue(value: number): number {
+  const range = valueRange.value
+  if (!range) return PADDING.top
+  return PADDING.top + ((range.max - value) / (range.max - range.min)) * plotHeight
+}
+
+const points = computed<ChartPoint[]>(() =>
+  inrRecords.value.map(record => ({
+    ...record,
+    x: xForDate(record.date),
+    y: yForValue(record.value),
+  }))
+)
+
+function buildSmoothPath(series: ChartPoint[]): string {
+  if (series.length === 0) return ''
+  if (series.length === 1) return `M ${series[0].x} ${series[0].y}`
+  if (series.length === 2) return `M ${series[0].x} ${series[0].y} L ${series[1].x} ${series[1].y}`
+  let path = `M ${series[0].x} ${series[0].y}`
+  for (let index = 0; index < series.length - 1; index += 1) {
+    const p0 = series[index - 1] ?? series[index]
+    const p1 = series[index]
+    const p2 = series[index + 1]
+    const p3 = series[index + 2] ?? p2
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`
+  }
+  return path
+}
+
+const linePath = computed(() => buildSmoothPath(points.value))
+
+const targetBand = computed(() => {
+  const range = valueRange.value
+  if (!range) return null
+  const yTop = yForValue(props.patient.patient.targetInrHigh)
+  const yBottom = yForValue(props.patient.patient.targetInrLow)
+  return {
+    y: Math.min(yTop, yBottom),
+    height: Math.abs(yBottom - yTop),
+  }
+})
+
+const yTicks = computed(() => {
+  const range = valueRange.value
+  if (!range) return []
+  const step = Math.max(0.5, Math.ceil(((range.max - range.min) / 3) * 2) / 2)
+  const ticks: number[] = []
+  for (let value = range.min; value <= range.max + 0.001; value += step) {
+    ticks.push(Number(value.toFixed(1)))
+  }
+  return ticks
+})
+
+const xTicks = computed(() => {
+  const records = inrRecords.value
+  if (!records.length) return []
+  return records.filter((_, i) => i === 0 || i === records.length - 1 || i === Math.floor(records.length / 2)).map(record => ({
+    label: new Date(record.date).toLocaleDateString('th-TH', { month: 'short', day: 'numeric' }),
+    x: xForDate(record.date),
+  }))
+})
 
 const info = computed(() => props.patient.hosxpInfo)
 const p = computed(() => props.patient.patient)
@@ -160,7 +177,72 @@ function ttrClass(v: number | null): string {
         <span class="label">ค่า INR วันนี้</span>
         <span class="inr-value">{{ visit.inrValue?.toFixed(2) ?? '-' }}</span>
       </div>
-      <div ref="chartContainer" class="inr-chart" />
+      <div class="inr-chart">
+        <svg v-if="inrRecords.length" :viewBox="`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`" preserveAspectRatio="xMidYMid meet">
+          <rect
+            v-if="targetBand"
+            :x="PADDING.left"
+            :y="targetBand.y"
+            :width="CHART_WIDTH - PADDING.left - PADDING.right"
+            :height="targetBand.height"
+            class="target-band"
+          />
+          <g class="grid">
+            <line
+              v-for="tick in yTicks"
+              :key="`y-${tick}`"
+              :x1="PADDING.left"
+              :y1="yForValue(tick)"
+              :x2="CHART_WIDTH - PADDING.right"
+              :y2="yForValue(tick)"
+            />
+          </g>
+          <g class="targets">
+            <line
+              :x1="PADDING.left"
+              :y1="yForValue(patient.patient.targetInrHigh)"
+              :x2="CHART_WIDTH - PADDING.right"
+              :y2="yForValue(patient.patient.targetInrHigh)"
+              class="target-line"
+            />
+            <line
+              :x1="PADDING.left"
+              :y1="yForValue(patient.patient.targetInrLow)"
+              :x2="CHART_WIDTH - PADDING.right"
+              :y2="yForValue(patient.patient.targetInrLow)"
+              class="target-line"
+            />
+          </g>
+          <path :d="linePath" class="trend-line" />
+          <g class="points">
+            <circle
+              v-for="point in points"
+              :key="`${point.date}-${point.value}`"
+              :cx="point.x"
+              :cy="point.y"
+              r="3"
+            />
+          </g>
+          <g class="x-axis">
+            <template v-for="tick in xTicks" :key="`x-${tick.x}`">
+              <line :x1="tick.x" :y1="PADDING.top" :x2="tick.x" :y2="CHART_HEIGHT - PADDING.bottom" class="axis-grid" />
+              <text :x="tick.x" :y="CHART_HEIGHT - 4" text-anchor="middle">{{ tick.label }}</text>
+            </template>
+          </g>
+          <g class="y-axis">
+            <text
+              v-for="tick in yTicks"
+              :key="`label-${tick}`"
+              :x="CHART_WIDTH - 4"
+              :y="yForValue(tick) + 3"
+              text-anchor="end"
+            >
+              {{ tick.toFixed(1) }}
+            </text>
+          </g>
+        </svg>
+        <span v-else class="no-data">ไม่มีข้อมูล</span>
+      </div>
     </div>
 
     <div class="dose-section">
@@ -304,6 +386,59 @@ function ttrClass(v: number | null): string {
 .inr-chart {
   flex: 1;
   height: 180px;
+}
+
+.inr-chart svg {
+  width: 100%;
+  height: 100%;
+}
+
+.inr-chart .no-data {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--color-stone);
+  font-size: var(--typography-body-sm-size);
+}
+
+.inr-chart .target-band {
+  fill: color-mix(in srgb, var(--color-success-accent) 15%, transparent);
+}
+
+.inr-chart .grid line {
+  stroke: var(--color-hairline-soft);
+  stroke-width: 1;
+}
+
+.inr-chart .axis-grid {
+  stroke: var(--color-hairline-soft);
+  stroke-width: 1;
+}
+
+.inr-chart .target-line {
+  stroke: var(--color-success-accent);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.inr-chart .trend-line {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.inr-chart .points circle {
+  fill: var(--color-primary);
+  stroke: var(--color-canvas);
+  stroke-width: 1.5;
+}
+
+.inr-chart .x-axis text,
+.inr-chart .y-axis text {
+  fill: var(--color-slate);
+  font-size: 10px;
 }
 
 .dose-section {
