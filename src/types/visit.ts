@@ -8,6 +8,17 @@ export interface DoseSchedule {
   sun: number
 }
 
+export interface PillLineSummary {
+  mg: number
+  dispensedCount: number
+  usageNote: string
+}
+
+export interface TotalPillsSummary {
+  header: string
+  pillLines: PillLineSummary[]
+}
+
 export interface WfVisit {
   id: number
   hn: string
@@ -18,6 +29,7 @@ export interface WfVisit {
   doseDetail?: DoseSchedule
   newDoseMgday?: number
   newDoseDetail?: DoseSchedule
+  newDoseDescription?: string
   doseChanged: boolean
   nextAppointment?: string
   nextInrDue?: string
@@ -27,6 +39,7 @@ export interface WfVisit {
   adherence?: 'good' | 'fair' | 'poor'
   createdBy?: string
   createdAt: string
+  totalPillsSummary?: TotalPillsSummary
 }
 
 export interface VisitInput {
@@ -38,6 +51,7 @@ export interface VisitInput {
   doseDetail?: DoseSchedule
   newDoseMgday?: number
   newDoseDetail?: DoseSchedule
+  newDoseDescription?: string
   doseChanged: boolean
   nextAppointment?: string
   nextInrDue?: string

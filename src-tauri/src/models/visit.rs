@@ -14,6 +14,21 @@ pub struct DoseSchedule {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PillLineSummary {
+  pub mg: u8,
+  pub dispensed_count: u32,
+  pub usage_note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TotalPillsSummary {
+  pub header: String,
+  pub pill_lines: Vec<PillLineSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WfVisit {
   pub id: i64,
   pub hn: String,
@@ -24,6 +39,7 @@ pub struct WfVisit {
   pub dose_detail: Option<DoseSchedule>,
   pub new_dose_mgday: Option<f64>,
   pub new_dose_detail: Option<DoseSchedule>,
+  pub new_dose_description: Option<String>,
   pub dose_changed: bool,
   pub next_appointment: Option<String>,
   pub next_inr_due: Option<String>,
@@ -33,6 +49,7 @@ pub struct WfVisit {
   pub adherence: Option<String>,
   pub created_by: Option<String>,
   pub created_at: String,
+  pub total_pills_summary: Option<TotalPillsSummary>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,6 +63,7 @@ pub struct VisitInput {
   pub dose_detail: Option<DoseSchedule>,
   pub new_dose_mgday: Option<f64>,
   pub new_dose_detail: Option<DoseSchedule>,
+  pub new_dose_description: Option<String>,
   pub dose_changed: bool,
   pub next_appointment: Option<String>,
   pub next_inr_due: Option<String>,

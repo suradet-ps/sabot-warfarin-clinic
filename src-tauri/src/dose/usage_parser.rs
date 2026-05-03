@@ -164,15 +164,15 @@ fn collect_explicit_day_indexes(tokens: &[String]) -> Vec<usize> {
       }
     };
 
-    if let Some((connector_index, end_day_index, end_day)) = find_day_range(tokens, index) {
-      if connector_index == index + 1 || is_filler_token(&tokens[index + 1]) {
+    if let Some((connector_index, end_day_index, end_day)) = find_day_range(tokens, index)
+      && (connector_index == index + 1 || is_filler_token(&tokens[index + 1]))
+      {
         for day in expand_day_range(current_day, end_day) {
           matched_days.insert(day);
         }
         index = end_day_index + 1;
         continue;
       }
-    }
 
     matched_days.insert(current_day);
     index += 1;
@@ -279,15 +279,8 @@ fn normalize_usage_text(input: &str) -> String {
   }
 
   text = text
-    .replace(',', " ")
-    .replace(';', " ")
-    .replace('(', " ")
-    .replace(')', " ")
-    .replace('\n', " ")
-    .replace('\t', " ")
-    .replace('-', " - ")
-    .replace('–', " - ")
-    .replace('—', " - ")
+    .replace([',', ';', '(', ')', '\n', '\t'], " ")
+    .replace(['-', '–', '—'], " - ")
     .replace("ถึง", " ถึง ")
     .replace("to", " to ")
     .replace("thru", " thru ")

@@ -4,7 +4,7 @@
 //! needed at compile time. All public functions return `anyhow::Result`.
 
 use anyhow::{bail, Context, Result};
-use chrono::Utc;
+use chrono::{Datelike, Utc};
 use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
 use std::path::PathBuf;
 
@@ -13,8 +13,82 @@ use crate::models::{
   inr::InrRecord,
   outcome::{OutcomeInput, WfOutcome},
   patient::{EnrollmentInput, WfPatient},
-  visit::{VisitInput, WfVisit},
+  visit::{DoseSchedule, VisitInput, WfVisit},
 };
+
+fn calculate_pills_summary(
+  visit_date: &str,
+  new_dose_detail: &DoseSchedule,
+  next_appointment: &str,
+) -> Option<crate::models::visit::TotalPillsSummary> {
+  let schedule = new_dose_detail;
+  let visit = chrono::NaiveDate::parse_from_str(visit_date, "%Y-%m-%d").ok()?;
+  let next = chrono::NaiveDate::parse_from_str(next_appointment, "%Y-%m-%d").ok()?;
+
+  let days = (next - visit).num_days();
+  if days <= 0 {
+    return None;
+  }
+
+  let day_doses = [schedule.mon, schedule.tue, schedule.wed, schedule.thu, schedule.fri, schedule.sat, schedule.sun];
+
+  let mut pill_counts: std::collections::HashMap<u8, (u32, u32)> = std::collections::HashMap::new();
+
+  for d in 0..days {
+    let current = visit + chrono::Duration::days(d);
+    let day_index = current.weekday().num_days_from_monday() as usize;
+    let dose = day_doses.get(day_index).copied().unwrap_or(0.0);
+
+    if dose > 0.0 {
+      let whole = dose.floor() as u32;
+      let has_half = (dose - dose.floor()) >= 0.5;
+
+      for _ in 0..whole {
+        let mg = if dose >= 5.0 { 5 } else if dose >= 3.0 { 3 } else { 2 };
+        let entry = pill_counts.entry(mg).or_insert((0, 0));
+        entry.0 += 1;
+      }
+      if has_half {
+        let mg = if dose >= 2.5 { 5 } else if dose >= 1.5 { 3 } else { 2 };
+        let entry = pill_counts.entry(mg).or_insert((0, 0));
+        entry.1 += 1;
+      }
+    }
+  }
+
+  let lines: Vec<crate::models::visit::PillLineSummary> = pill_counts
+    .into_iter()
+    .filter(|(_, (dispensed, _))| *dispensed > 0)
+    .map(|(mg, (dispensed, half))| {
+      let usage_note = format!(
+        "ใช้ {} ยา {} มก. รวม {} เม็ด (ครึ่งเม็ด {} เม็ด)",
+        if days >= 28 { "รายสัปดาห์" } else { "รายวัน" },
+        mg,
+        if half > 0 { format!("{}+{}", dispensed, half) } else { dispensed.to_string() },
+        half
+      );
+      crate::models::visit::PillLineSummary {
+        mg,
+        dispensed_count: dispensed,
+        usage_note,
+      }
+    })
+    .collect();
+
+if lines.is_empty() {
+    return None;
+  }
+
+  let header = format!(
+    "รวมยาถึงวันนัด ({} วัน): {} - {}",
+    days, visit_date, next_appointment
+  );
+
+  Some(crate::models::visit::TotalPillsSummary {
+    header,
+    pill_lines: lines,
+  })
+}
 
 // Pool initialisation
 
@@ -273,7 +347,7 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
 pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisit>> {
   let rows = sqlx::query(
     "SELECT id, hn, visit_date, inr_value, inr_source, \
-         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, \
+         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, \
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at \
          FROM wf_visits WHERE hn = ? ORDER BY visit_date DESC",
@@ -290,18 +364,28 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         .try_get::<Option<String>, _>("dose_detail")
         .ok()
         .flatten()
-        .and_then(|s| serde_json::from_str(&s).ok());
+        .and_then(|s| serde_json::from_str::<DoseSchedule>(&s).ok());
       let new_dose_detail = r
         .try_get::<Option<String>, _>("new_dose_detail")
         .ok()
         .flatten()
-        .and_then(|s| serde_json::from_str(&s).ok());
+        .and_then(|s| serde_json::from_str::<DoseSchedule>(&s).ok());
       let side_effects = r
         .try_get::<Option<String>, _>("side_effects")
         .ok()
         .flatten()
-        .and_then(|s| serde_json::from_str(&s).ok());
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok());
       let dose_changed: i32 = r.try_get("dose_changed").unwrap_or(0);
+      let visit_date_str: String = r.get("visit_date");
+      let next_appt: Option<String> = r.try_get("next_appointment").ok();
+      let _new_dose_desc: Option<String> = r.try_get("new_dose_description").ok();
+
+      let _total_pills_summary = if let (Some(na), Some(nd)) = (&next_appt, &new_dose_detail) {
+        calculate_pills_summary(&visit_date_str, nd, na)
+      } else {
+        None
+      };
+
       Ok(WfVisit {
         id: r.get("id"),
         hn: r.get("hn"),
@@ -312,6 +396,7 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         dose_detail,
         new_dose_mgday: r.try_get("new_dose_mgday").ok(),
         new_dose_detail,
+        new_dose_description: r.try_get("new_dose_description").ok(),
         dose_changed: dose_changed != 0,
         next_appointment: r.try_get("next_appointment").ok(),
         next_inr_due: r.try_get("next_inr_due").ok(),
@@ -321,6 +406,7 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         adherence: r.try_get("adherence").ok(),
         created_by: r.try_get("created_by").ok(),
         created_at: r.get("created_at"),
+        total_pills_summary: None,
       })
     })
     .collect()
@@ -329,7 +415,7 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
 pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<WfVisit>> {
   let row = sqlx::query(
     "SELECT id, hn, visit_date, inr_value, inr_source, \
-         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, \
+         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, \
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at \
          FROM wf_visits WHERE id = ?",
@@ -349,25 +435,36 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       .try_get::<Option<String>, _>("new_dose_detail")
       .ok()
       .flatten()
-      .and_then(|s| serde_json::from_str(&s).ok());
+      .and_then(|s| serde_json::from_str::<DoseSchedule>(&s).ok());
     let side_effects = r
       .try_get::<Option<String>, _>("side_effects")
       .ok()
       .flatten()
-      .and_then(|s| serde_json::from_str(&s).ok());
+      .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok());
     let dose_changed: i32 = r.try_get("dose_changed").unwrap_or(0);
+    let visit_date_str: String = r.get("visit_date");
+    let next_appt_str: Option<String> = r.try_get("next_appointment").ok();
+    let new_dose_desc: Option<String> = r.try_get("new_dose_description").ok();
+
+    let total_pills_summary = if let (Some(vd), Some(na), Some(nd)) = (Some(&visit_date_str), &next_appt_str, &new_dose_detail) {
+      calculate_pills_summary(vd, nd, na)
+    } else {
+      None
+    };
+
     WfVisit {
       id: r.get("id"),
       hn: r.get("hn"),
-      visit_date: r.get("visit_date"),
+      visit_date: visit_date_str,
       inr_value: r.try_get("inr_value").ok(),
       inr_source: r.try_get("inr_source").ok(),
       current_dose_mgday: r.try_get("current_dose_mgday").ok(),
       dose_detail,
       new_dose_mgday: r.try_get("new_dose_mgday").ok(),
       new_dose_detail,
+      new_dose_description: new_dose_desc,
       dose_changed: dose_changed != 0,
-      next_appointment: r.try_get("next_appointment").ok(),
+      next_appointment: next_appt_str,
       next_inr_due: r.try_get("next_inr_due").ok(),
       physician: r.try_get("physician").ok(),
       notes: r.try_get("notes").ok(),
@@ -375,6 +472,7 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       adherence: r.try_get("adherence").ok(),
       created_by: r.try_get("created_by").ok(),
       created_at: r.get("created_at"),
+      total_pills_summary,
     }
   }))
 }

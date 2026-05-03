@@ -215,11 +215,11 @@ async fn try_get_hosxp_patient(state: &AppState, hn: &str) -> HosxpPatient {
     .flatten()
     .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
 
-  if let Some(config) = config_result {
-    if let Ok(Some(info)) = get_hosxp_patient(&config, hn).await {
+  if let Some(config) = config_result
+    && let Ok(Some(info)) = get_hosxp_patient(&config, hn).await
+    {
       return info;
     }
-  }
 
   HosxpPatient {
     hn: hn.to_string(),
@@ -243,11 +243,11 @@ async fn try_get_dispensing_history(
     .flatten()
     .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
 
-  if let Some(config) = config_result {
-    if let Ok(records) = get_dispensing_history(&config, hn).await {
+  if let Some(config) = config_result
+    && let Ok(records) = get_dispensing_history(&config, hn).await
+    {
       return records;
     }
-  }
 
   Vec::new()
 }
@@ -261,13 +261,12 @@ pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord
     .flatten()
     .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
 
-  if let Some(config) = config_result {
-    if let Ok(records) = crate::db::mysql::get_inr_history(&config, hn).await {
-      if !records.is_empty() {
-        return records;
-      }
+  if let Some(config) = config_result
+    && let Ok(records) = crate::db::mysql::get_inr_history(&config, hn).await
+    && !records.is_empty()
+    {
+      return records;
     }
-  }
 
   get_inr_from_visits(&state.pool, hn)
     .await

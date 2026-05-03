@@ -133,12 +133,12 @@ pub async fn get_patient_alerts(state: State<'_, AppState>) -> Result<Vec<Patien
       .map(|r| (r.date.clone(), r.value))
       .collect();
     if let Some(ttr) = calculate_ttr(
-      &inr_pairs,
-      patient.target_inr_low,
-      patient.target_inr_high,
-      182,
-    ) {
-      if ttr < TTR_RED_THRESHOLD {
+        &inr_pairs,
+        patient.target_inr_low,
+        patient.target_inr_high,
+        182,
+      ) && ttr < TTR_RED_THRESHOLD
+      {
         alerts.push(PatientAlert {
           hn: patient.hn.clone(),
           patient_name: display_name.clone(),
@@ -149,26 +149,25 @@ pub async fn get_patient_alerts(state: State<'_, AppState>) -> Result<Vec<Patien
           date: None,
         });
       }
-    }
 
     // ── Missed appointment ─────────────────────────────────────────────
     for appt in pending_appts
       .iter()
       .filter(|a| a.hn == patient.hn && a.status == "scheduled")
     {
-      if let Ok(appt_date) = NaiveDate::parse_from_str(&appt.appt_date, "%Y-%m-%d") {
-        if appt_date < today {
-          let days_overdue = (today - appt_date).num_days();
-          alerts.push(PatientAlert {
-            hn: patient.hn.clone(),
-            patient_name: display_name.clone(),
-            alert_type: "missed_appointment".to_string(),
-            severity: "warning".to_string(),
-            message: format!("ขาดนัด {days_overdue} วัน (นัด {})", appt.appt_date),
-            value: None,
-            date: Some(appt.appt_date.clone()),
-          });
-        }
+      if let Ok(appt_date) = NaiveDate::parse_from_str(&appt.appt_date, "%Y-%m-%d")
+        && appt_date < today
+      {
+        let days_overdue = (today - appt_date).num_days();
+        alerts.push(PatientAlert {
+          hn: patient.hn.clone(),
+          patient_name: display_name.clone(),
+          alert_type: "missed_appointment".to_string(),
+          severity: "warning".to_string(),
+          message: format!("ขาดนัด {days_overdue} วัน (นัด {})", appt.appt_date),
+          value: None,
+          date: Some(appt.appt_date.clone()),
+        });
       }
     }
   }

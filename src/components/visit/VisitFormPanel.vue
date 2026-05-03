@@ -52,6 +52,7 @@ const currentDoseSource = ref<'visit' | 'hosxp' | 'manual'>('manual')
 const currentDoseSourceText = ref('')
 const doseOptions = ref<RegimenOption[]>([])
 const selectedDoseOptionIndex = ref<number | null>(null)
+const selectedDoseDescription = ref<string>('')
 const loadingDoseOptions = ref(false)
 const doseOptionsError = ref<string | null>(null)
 const availablePills = ref<AvailablePills>({ ...DEFAULT_AVAILABLE_PILLS })
@@ -311,10 +312,6 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
             <label class="form-field">
               <span class="caption label">นัดครั้งต่อไป</span>
               <input class="input" type="date" v-model="nextAppointment" />
-            </label>
-            <label class="form-field">
-              <span class="caption label">ตรวจ INR ครั้งต่อไป</span>
-              <input class="input" type="date" v-model="nextInrDue" />
             </label>
             <label class="form-field">
               <span class="caption label">แพทย์</span>
