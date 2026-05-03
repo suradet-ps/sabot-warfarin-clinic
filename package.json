@@ -19,8 +19,10 @@
     "lightweight-charts": "^5.2.0",
     "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
+    "vite-plugin-wasm": "^3.5.0",
     "vue": "^3.5.33",
-    "vue-router": "^5.0.6"
+    "vue-router": "^5.0.6",
+    "warfarin_logic": "file:./src/warfarin_logic/pkg"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

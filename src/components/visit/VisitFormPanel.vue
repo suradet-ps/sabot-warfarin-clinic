@@ -3,10 +3,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { X } from 'lucide-vue-next'
 import DayDoseTable from '#/components/visit/DayDoseTable.vue'
+import DoseOptionsPanel from '#/components/visit/DoseOptionsPanel.vue'
 import type { DispensingRecord } from '#/types/dispensing'
 import type { InrRecord } from '#/types/inr'
 import type { PatientDetail } from '#/types/patient'
 import type { DoseSuggestion, VisitInput, WfVisit } from '#/types/visit'
+import type { RegimenOption, AvailablePills } from '@/types/dose'
+import { useDoseCalculator } from '@/composables/useDoseCalculator'
 import {
   aggregateDispensingByVisit,
   dateInputToday,
@@ -17,6 +20,8 @@ import {
   scheduleAverageDose,
   scheduleWeeklyTotal,
 } from '#/utils/clinic'
+
+const { generateDoseOptions, DEFAULT_AVAILABLE_PILLS } = useDoseCalculator()
 
 const props = defineProps<{ hn: string }>()
 const modelValue = defineModel<boolean>({ default: false })
@@ -45,6 +50,13 @@ const latestHosxpDispense = ref<DispensingRecord | null>(null)
 const latestHosxpVisit = ref<ReturnType<typeof aggregateDispensingByVisit>[number] | null>(null)
 const currentDoseSource = ref<'visit' | 'hosxp' | 'manual'>('manual')
 const currentDoseSourceText = ref('')
+const doseOptions = ref<RegimenOption[]>([])
+const selectedDoseOptionIndex = ref<number | null>(null)
+const loadingDoseOptions = ref(false)
+const doseOptionsError = ref<string | null>(null)
+const availablePills = ref<AvailablePills>({ ...DEFAULT_AVAILABLE_PILLS })
+const allowHalf = ref(true)
+const specialDayPattern = ref<'fri-sun' | 'mon-wed-fri'>('fri-sun')
 
 const sideEffectOptions = [
   { key: 'bleeding_gums', label: 'เหงือกเลือดออก' },
@@ -100,6 +112,11 @@ function applyHosxpDose(visit: NonNullable<typeof latestHosxpVisit.value>) {
 async function fetchSuggestion() {
   if (currentDoseMgday.value === null || inrValue.value === null) return
   loadingSuggestion.value = true
+  loadingDoseOptions.value = true
+  doseOptionsError.value = null
+  doseOptions.value = []
+  selectedDoseOptionIndex.value = null
+
   try {
     suggestion.value = await invoke<DoseSuggestion>('suggest_dose', {
       currentDose: currentDoseMgday.value,
@@ -109,12 +126,53 @@ async function fetchSuggestion() {
     })
     if (suggestion.value) {
       newDoseMgday.value = suggestion.value.suggestedDoseMgday
+
+      const weeklyDose = suggestion.value.suggestedDoseMgday * 7
+      const daysUntilAppointment = nextAppointment.value
+        ? Math.max(1, Math.ceil((new Date(nextAppointment.value).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+        : 28
+      const startDayOfWeek = new Date().getDay()
+
+      const options = await generateDoseOptions(
+        weeklyDose,
+        availablePills.value,
+        allowHalf.value,
+        specialDayPattern.value,
+        daysUntilAppointment,
+        startDayOfWeek
+      )
+      doseOptions.value = options
+
+      if (options.length === 0) {
+        doseOptionsError.value = 'ไม่พบตัวเลือกที่เหมาะสม ลองปรับการตั้งค่ายา'
+      }
     }
-  } catch {
-    // non-critical
+  } catch (e) {
+    doseOptionsError.value = String(e)
   } finally {
     loadingSuggestion.value = false
+    loadingDoseOptions.value = false
   }
+}
+
+function handleSelectDoseOption(index: number) {
+  selectedDoseOptionIndex.value = index
+  const option = doseOptions.value[index]
+
+  const dayMap: Record<number, string> = {
+    0: 'mon', 1: 'tue', 2: 'wed', 3: 'thu', 4: 'fri', 5: 'sat', 6: 'sun',
+  }
+
+  const newDetail = emptyDoseSchedule()
+  for (const day of option.weekly_schedule) {
+    const dayKey = dayMap[day.day_index]
+    if (dayKey && dayKey in newDetail) {
+      newDetail[dayKey as keyof typeof newDetail] = day.is_stop_day ? 0 : day.total_dose
+    }
+  }
+
+  newDoseDetail.value = newDetail
+  newDoseMgday.value = option.weekly_dose_actual / 7
 }
 
 const currentDoseAvg = computed(() => scheduleAverageDose(currentDoseDetail.value))
@@ -227,6 +285,20 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
             </span>
           </div>
 
+          <div v-if="doseOptions.length > 0 || loadingDoseOptions || doseOptionsError" class="dose-options-section">
+            <p class="caption label">ตัวเลือกตารางการกินยา</p>
+            <DoseOptionsPanel
+              :options="doseOptions"
+              :selected-index="selectedDoseOptionIndex"
+              :loading="loadingDoseOptions"
+              @select="handleSelectDoseOption"
+            />
+            <p v-if="doseOptionsError" class="caption" style="color: var(--color-brand-coral)">{{ doseOptionsError }}</p>
+            <p v-if="selectedDoseOptionIndex !== null" class="body-sm-medium" style="color: var(--color-success-accent)">
+              ✓ เลือกตัวเลือก {{ selectedDoseOptionIndex + 1 }} แล้ว ตารางยาใหม่จะถูกอัพเดทด้านล่าง
+            </p>
+          </div>
+
           <div class="form-section">
             <p class="caption label">ตารางยาใหม่ (mg/วัน)</p>
             <DayDoseTable v-model="newDoseDetail" />
@@ -318,6 +390,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
 .form-section { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .label { color: var(--color-slate); }
 .suggestion-row { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
+.dose-options-section { display: flex; flex-direction: column; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
 .radio-group { display: flex; gap: var(--spacing-lg); }
 .radio-label { display: flex; align-items: center; gap: var(--spacing-xs); cursor: pointer; }
 .checkbox-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--spacing-xs); }
