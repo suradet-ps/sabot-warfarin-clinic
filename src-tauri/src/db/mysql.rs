@@ -20,6 +20,7 @@ use crate::models::{
   inr::InrRecord,
   patient::{HosxpPatient, PatientDrugRecord, SearchFilters, SearchResponse},
 };
+use crate::dose::usage_parser::parse_dispensing_usage;
 
 /// Warfarin drug item codes at Sarabosot Hospital.
 pub const WARFARIN_ICODES: [&str; 3] = ["1600014", "1600013", "1600024"];
@@ -546,39 +547,86 @@ pub async fn search_hosxp_warfarin_patients(
 
 pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<DispensingRecord>> {
   let pool = create_pool(config).await?;
-  let rows = sqlx::query(
+  let rows = match sqlx::query(
     r#"
         SELECT
             o.hn,
+            o.vn,
             o.vstdate,
             o.icode,
             COALESCE(d.name, 'Warfarin')   AS drug_name,
             COALESCE(d.strength, '')       AS strength,
             CAST(o.qty AS DOUBLE)          AS qty,
-            CAST(o.unitprice AS DOUBLE)    AS unitprice
+            CAST(o.unitprice AS DOUBLE)    AS unitprice,
+            CAST(o.drugusage AS CHAR)      AS drugusage_code,
+            NULLIF(TRIM(CONCAT_WS(' ', du.name1, du.name2, du.name3)), '') AS usage_text
         FROM opitemrece o
         LEFT JOIN drugitems d ON d.icode = o.icode
+        LEFT JOIN drugusage du ON du.drugusage = o.drugusage
         WHERE o.hn = ?
           AND o.icode IN ('1600014', '1600013', '1600024')
-        ORDER BY o.vstdate DESC, o.icode
+        ORDER BY o.vstdate DESC, o.vn DESC, o.icode
         "#,
   )
   .bind(hn)
   .fetch_all(&pool)
   .await
-  .context("failed to query warfarin dispensing history")?;
+  {
+    Ok(rows) => rows,
+    Err(_) => {
+      sqlx::query(
+    r#"
+        SELECT
+            o.hn,
+            o.vn,
+            o.vstdate,
+            o.icode,
+            COALESCE(d.name, 'Warfarin')   AS drug_name,
+            COALESCE(d.strength, '')       AS strength,
+            CAST(o.qty AS DOUBLE)          AS qty,
+            CAST(o.unitprice AS DOUBLE)    AS unitprice,
+            NULL                           AS drugusage_code,
+            NULL                           AS usage_text
+        FROM opitemrece o
+        LEFT JOIN drugitems d ON d.icode = o.icode
+        WHERE o.hn = ?
+          AND o.icode IN ('1600014', '1600013', '1600024')
+        ORDER BY o.vstdate DESC, o.vn DESC, o.icode
+        "#,
+      )
+      .bind(hn)
+      .fetch_all(&pool)
+      .await
+      .context("failed to query warfarin dispensing history")?
+    }
+  };
 
   Ok(
     rows
       .iter()
-      .map(|r| DispensingRecord {
-        hn: r.get("hn"),
-        vstdate: get_date_string(r, "vstdate"),
-        icode: r.get("icode"),
-        drug_name: r.try_get("drug_name").unwrap_or_default(),
-        strength: r.try_get("strength").unwrap_or_default(),
-        qty: r.try_get("qty").unwrap_or(0.0),
-        unitprice: r.try_get("unitprice").unwrap_or(0.0),
+      .map(|r| {
+        let strength: String = r.try_get("strength").unwrap_or_default();
+        let usage_text = get_optional_string(r, "usage_text")
+          .map(|value| value.trim().to_string())
+          .filter(|value| !value.is_empty());
+        let parsed_usage = usage_text
+          .as_deref()
+          .map(|value| parse_dispensing_usage(&strength, value));
+
+        DispensingRecord {
+          hn: r.get("hn"),
+          vn: get_optional_string(r, "vn"),
+          vstdate: get_date_string(r, "vstdate"),
+          icode: r.get("icode"),
+          drug_name: r.try_get("drug_name").unwrap_or_default(),
+          strength,
+          qty: r.try_get("qty").unwrap_or(0.0),
+          unitprice: r.try_get("unitprice").unwrap_or(0.0),
+          drugusage_code: get_optional_string(r, "drugusage_code"),
+          usage_text,
+          parsed_dose: parsed_usage.as_ref().and_then(|value| value.dose.clone()),
+          usage_parse_note: parsed_usage.and_then(|value| value.note),
+        }
       })
       .collect(),
   )

@@ -3,13 +3,17 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { X } from 'lucide-vue-next'
 import DayDoseTable from '#/components/visit/DayDoseTable.vue'
+import type { DispensingRecord } from '#/types/dispensing'
 import type { InrRecord } from '#/types/inr'
+import type { PatientDetail } from '#/types/patient'
 import type { DoseSuggestion, VisitInput, WfVisit } from '#/types/visit'
 import {
   dateInputToday,
+  formatThaiDate,
   emptyDoseSchedule,
   normalizeDoseSchedule,
   scheduleAverageDose,
+  scheduleWeeklyTotal,
 } from '#/utils/clinic'
 
 const props = defineProps<{ hn: string }>()
@@ -35,6 +39,9 @@ const notes = ref('')
 const suggestion = ref<DoseSuggestion | null>(null)
 const targetLow = ref(2.0)
 const targetHigh = ref(3.0)
+const latestHosxpDispense = ref<DispensingRecord | null>(null)
+const currentDoseSource = ref<'visit' | 'hosxp' | 'manual'>('manual')
+const currentDoseSourceText = ref('')
 
 const sideEffectOptions = [
   { key: 'bleeding_gums', label: 'เหงือกเลือดออก' },
@@ -52,22 +59,38 @@ async function loadDefaults() {
     const [latestInr, visits, patientData] = await Promise.all([
       invoke<InrRecord | null>('get_latest_inr', { hn: props.hn }),
       invoke<WfVisit[]>('get_visit_history', { hn: props.hn }),
-      invoke<{ patient: { targetInrLow: number; targetInrHigh: number } }>('get_patient_detail', { hn: props.hn }),
+      invoke<PatientDetail>('get_patient_detail', { hn: props.hn }),
     ])
     if (latestInr) {
       inrValue.value = latestInr.value
       inrSource.value = latestInr.source as typeof inrSource.value ?? 'lab_order'
     }
     const lastVisit = visits[0]
+    latestHosxpDispense.value = patientData.dispensingHistory?.find((record) => !!record.parsedDose) ?? null
     if (lastVisit) {
       currentDoseMgday.value = lastVisit.newDoseMgday ?? lastVisit.currentDoseMgday ?? null
       currentDoseDetail.value = normalizeDoseSchedule(lastVisit.newDoseDetail ?? lastVisit.doseDetail)
+      currentDoseSource.value = 'visit'
+      currentDoseSourceText.value = 'ใช้ขนาดยาจาก visit ล่าสุดที่บันทึกในคลินิก'
+    } else if (latestHosxpDispense.value?.parsedDose) {
+      applyHosxpDose(latestHosxpDispense.value)
+    } else {
+      currentDoseSource.value = 'manual'
+      currentDoseSourceText.value = 'ไม่พบขนาดยาเดิมที่คำนวณได้จากระบบ กรุณากรอกเอง'
     }
     targetLow.value = patientData.patient.targetInrLow
     targetHigh.value = patientData.patient.targetInrHigh
   } catch {
     // non-critical
   }
+}
+
+function applyHosxpDose(record: DispensingRecord) {
+  if (!record.parsedDose) return
+  currentDoseDetail.value = normalizeDoseSchedule(record.parsedDose.schedule)
+  currentDoseMgday.value = record.parsedDose.mgPerDayAverage
+  currentDoseSource.value = 'hosxp'
+  currentDoseSourceText.value = `ดึงจาก HosXP วันที่ ${formatThaiDate(record.vstdate)}${record.usageText ? `: ${record.usageText}` : ''}`
 }
 
 async function fetchSuggestion() {
@@ -91,7 +114,9 @@ async function fetchSuggestion() {
 }
 
 const currentDoseAvg = computed(() => scheduleAverageDose(currentDoseDetail.value))
+const currentDoseWeek = computed(() => scheduleWeeklyTotal(currentDoseDetail.value))
 const newDoseAvg = computed(() => scheduleAverageDose(newDoseDetail.value))
+const newDoseWeek = computed(() => scheduleWeeklyTotal(newDoseDetail.value))
 
 watch(currentDoseDetail, () => {
   currentDoseMgday.value = currentDoseAvg.value
@@ -170,8 +195,23 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
 
           <div class="form-section">
             <p class="caption label">ตารางยาเดิม (mg/วัน)</p>
+            <div class="dose-source-card">
+              <div>
+                <p class="body-sm-medium">{{ currentDoseSource === 'hosxp' ? 'ขนาดยาเดิมจาก HosXP' : currentDoseSource === 'visit' ? 'ขนาดยาเดิมจาก visit ล่าสุด' : 'กรอกขนาดยาเดิมเอง' }}</p>
+                <p class="caption dose-source-text">{{ currentDoseSourceText }}</p>
+              </div>
+              <button
+                v-if="latestHosxpDispense?.parsedDose && currentDoseSource !== 'hosxp'"
+                type="button"
+                class="btn btn-secondary btn-compact"
+                @click="applyHosxpDose(latestHosxpDispense)"
+              >
+                ใช้ค่าจาก HosXP ล่าสุด
+              </button>
+            </div>
             <DayDoseTable v-model="currentDoseDetail" />
-            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ currentDoseAvg.toFixed(2) }} mg/วัน</p>
+            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ currentDoseAvg.toFixed(2) }} mg/วัน | รวม {{ currentDoseWeek.toFixed(1) }} mg/week</p>
+            <p v-if="latestHosxpDispense?.usageParseNote" class="caption dose-warning">{{ latestHosxpDispense.usageParseNote }}</p>
           </div>
 
           <div class="suggestion-row">
@@ -186,7 +226,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
           <div class="form-section">
             <p class="caption label">ตารางยาใหม่ (mg/วัน)</p>
             <DayDoseTable v-model="newDoseDetail" />
-            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ newDoseAvg.toFixed(2) }} mg/วัน</p>
+            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ newDoseAvg.toFixed(2) }} mg/วัน | รวม {{ newDoseWeek.toFixed(1) }} mg/week</p>
           </div>
 
           <div class="form-row">
@@ -258,6 +298,19 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
 .panel-footer { display: flex; justify-content: flex-end; gap: var(--spacing-md); padding: var(--spacing-xl); border-top: 1px solid var(--color-hairline-soft); }
 .form-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--spacing-md); }
 .form-field { display: flex; flex-direction: column; gap: var(--spacing-xs); }
+.dose-source-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--rounded-xl);
+  background: var(--color-teal-light);
+}
+.dose-source-text { color: var(--color-slate); }
+.dose-warning { color: var(--color-brand-coral); }
+.btn-compact { padding-inline: var(--spacing-md); white-space: nowrap; }
 .form-section { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .label { color: var(--color-slate); }
 .suggestion-row { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
