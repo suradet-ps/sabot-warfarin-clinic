@@ -550,9 +550,10 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
   let rows = match sqlx::query(
     r#"
         SELECT
-            o.hn,
-            o.vn,
-            o.vstdate,
+          o.hn,
+          o.vn,
+          o.an,
+          o.vstdate,
             o.icode,
             COALESCE(d.name, 'Warfarin')   AS drug_name,
             COALESCE(d.strength, '')       AS strength,
@@ -588,9 +589,10 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
       sqlx::query(
     r#"
         SELECT
-            o.hn,
-            o.vn,
-            o.vstdate,
+          o.hn,
+          o.vn,
+          o.an,
+          o.vstdate,
             o.icode,
             COALESCE(d.name, 'Warfarin')   AS drug_name,
             COALESCE(d.strength, '')       AS strength,
@@ -628,6 +630,7 @@ pub async fn get_dispensing_history(config: &DbConfig, hn: &str) -> Result<Vec<D
         DispensingRecord {
           hn: r.get("hn"),
           vn: get_optional_string(r, "vn"),
+          an: get_optional_string(r, "an"),
           vstdate: get_date_string(r, "vstdate"),
           icode: r.get("icode"),
           drug_name: r.try_get("drug_name").unwrap_or_default(),

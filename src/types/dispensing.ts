@@ -12,6 +12,7 @@ export interface ParsedDoseInfo {
 export interface DispensingRecord {
   hn: string
   vn?: string
+  an?: string
   vstdate: string
   icode: string
   drugName: string

@@ -32,7 +32,7 @@ function regimenSummary(items: DispensingRecord[]): string {
       <thead>
         <tr>
           <th>&#x0E27;&#x0E31;&#x0E19;&#x0E17;&#x0E35;&#x0E48;</th>
-          <th>VN</th>
+          <th>VN/AN</th>
           <th>&#x0E23;&#x0E32;&#x0E22;&#x0E01;&#x0E32;&#x0E23;&#x0E22;&#x0E32;</th>
           <th>&#x0E27;&#x0E34;&#x0E18;&#x0E35;&#x0E43;&#x0E0A;&#x0E49;&#x0E22;&#x0E32;</th>
           <th>&#x0E1C;&#x0E25;&#x0E23;&#x0E27;&#x0E21;&#x0E15;&#x0E48;&#x0E2D; visit</th>
@@ -45,7 +45,7 @@ function regimenSummary(items: DispensingRecord[]): string {
         </tr>
         <tr v-for="visit in orderedVisits" :key="visit.visitKey" class="comparison-row">
           <td>{{ formatThaiDate(visit.vstdate) }}</td>
-          <td>{{ visit.vn || '-' }}</td>
+          <td>{{ visit.vn || visit.an || '-' }}</td>
           <td>
             <div class="drug-stack">
               <span class="body-sm-medium">{{ regimenSummary(visit.items) }}</span>

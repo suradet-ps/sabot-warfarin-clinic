@@ -18,6 +18,7 @@ pub struct ParsedDoseInfo {
 pub struct DispensingRecord {
   pub hn: String,
   pub vn: Option<String>,
+  pub an: Option<String>,
   pub vstdate: String,
   pub icode: String,
   pub drug_name: String,

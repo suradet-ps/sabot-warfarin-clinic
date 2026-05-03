@@ -145,6 +145,7 @@ export interface AggregatedDispensingVisit {
   visitKey: string
   hn: string
   vn?: string
+  an?: string
   vstdate: string
   items: DispensingRecord[]
   combinedSchedule: DoseSchedule
@@ -158,7 +159,8 @@ export function aggregateDispensingByVisit(records: DispensingRecord[]): Aggrega
   const visitMap = new Map<string, AggregatedDispensingVisit>()
 
   for (const record of sortDispensing(records)) {
-    const visitKey = `${record.vstdate}::${record.vn || 'no-vn'}`
+    const visitId = record.vn || record.an || 'no-vn'
+    const visitKey = `${record.vstdate}::${visitId}`
     const existing = visitMap.get(visitKey)
     if (existing) {
       existing.items.push(record)
@@ -179,6 +181,7 @@ export function aggregateDispensingByVisit(records: DispensingRecord[]): Aggrega
       visitKey,
       hn: record.hn,
       vn: record.vn,
+      an: record.an,
       vstdate: record.vstdate,
       items: [record],
       combinedSchedule,
@@ -189,7 +192,7 @@ export function aggregateDispensingByVisit(records: DispensingRecord[]): Aggrega
     })
   }
 
-  return [...visitMap.values()].sort((a, b) => `${b.vstdate}::${b.vn || ''}`.localeCompare(`${a.vstdate}::${a.vn || ''}`))
+  return [...visitMap.values()].sort((a, b) => `${b.vstdate}::${b.vn || b.an || ''}`.localeCompare(`${a.vstdate}::${a.vn || a.an || ''}`))
 }
 
 export function latestVisit(visits: WfVisit[]): WfVisit | undefined {
