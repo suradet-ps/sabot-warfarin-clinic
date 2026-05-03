@@ -404,6 +404,74 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
   Ok(id)
 }
 
+/// Updates an existing visit record. Returns error if visit not found.
+pub async fn update_visit(pool: &SqlitePool, visit_id: i64, input: &VisitInput) -> Result<()> {
+  let dose_detail_json = input
+    .dose_detail
+    .as_ref()
+    .map(|d| serde_json::to_string(d).unwrap_or_default());
+  let new_dose_detail_json = input
+    .new_dose_detail
+    .as_ref()
+    .map(|d| serde_json::to_string(d).unwrap_or_default());
+  let side_effects_json = input
+    .side_effects
+    .as_ref()
+    .map(|s| serde_json::to_string(s).unwrap_or_default());
+  let selected_dose_option_json = input
+    .selected_dose_option
+    .as_ref()
+    .map(|option| serde_json::to_string(option).unwrap_or_default());
+  let dose_changed = i32::from(input.dose_changed);
+
+  let mut tx = pool
+    .begin()
+    .await
+    .context("failed to begin visit update transaction")?;
+
+  let result = sqlx::query(
+    "UPDATE wf_visits SET \
+        visit_date = ?, inr_value = ?, inr_source = ?, \
+        current_dose_mgday = ?, dose_detail = ?, new_dose_mgday = ?, new_dose_detail = ?, new_dose_description = ?, selected_dose_option = ?, \
+        dose_changed = ?, next_appointment = ?, next_inr_due = ?, \
+        physician = ?, notes = ?, side_effects = ?, adherence = ? \
+        WHERE id = ?",
+  )
+  .bind(&input.visit_date)
+  .bind(input.inr_value)
+  .bind(&input.inr_source)
+  .bind(input.current_dose_mgday)
+  .bind(&dose_detail_json)
+  .bind(input.new_dose_mgday)
+  .bind(&new_dose_detail_json)
+  .bind(&input.new_dose_description)
+  .bind(&selected_dose_option_json)
+  .bind(dose_changed)
+  .bind(&input.next_appointment)
+  .bind(&input.next_inr_due)
+  .bind(&input.physician)
+  .bind(&input.notes)
+  .bind(&side_effects_json)
+  .bind(&input.adherence)
+  .bind(visit_id)
+  .execute(&mut *tx)
+  .await
+  .context("failed to update visit")?;
+
+  if result.rows_affected() == 0 {
+    bail!("visit not found: {visit_id}");
+  }
+
+  unlink_or_delete_visit_appointment(&mut tx, visit_id).await?;
+  sync_visit_appointment(&mut tx, input, visit_id, &Utc::now().to_rfc3339()).await?;
+
+  tx.commit()
+    .await
+    .context("failed to commit visit update transaction")?;
+
+  Ok(())
+}
+
 /// Returns all visit records for a patient, newest first.
 pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisit>> {
   let rows = sqlx::query(

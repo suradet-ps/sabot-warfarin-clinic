@@ -10,6 +10,7 @@ import type { PatientDetail } from '#/types/patient'
 import type { DoseSuggestion, VisitInput, WfVisit } from '#/types/visit'
 import type { RegimenOption, AvailablePills } from '@/types/dose'
 import { useDoseCalculator } from '@/composables/useDoseCalculator'
+import { useVisitStore } from '#/stores/visit'
 import {
   aggregateDispensingByVisit,
   dateInputToday,
@@ -28,15 +29,18 @@ import {
   regimenOptionMatchesSchedule,
 } from '#/utils/regimen'
 
+const visitStore = useVisitStore()
 const { generateDoseOptions, DEFAULT_AVAILABLE_PILLS } = useDoseCalculator()
 
-const props = defineProps<{ hn: string }>()
+const props = defineProps<{ hn: string; editVisit?: WfVisit | null }>()
 const modelValue = defineModel<boolean>({ default: false })
-const emit = defineEmits<{ (e: 'saved', visitId: number): void }>()
+const emit = defineEmits<{ (e: 'saved', visitId: number): void; (e: 'updated'): void }>()
 
 const saving = ref(false)
 const error = ref<string | null>(null)
 const loadingSuggestion = ref(false)
+const isEditMode = ref(false)
+const editingVisitId = ref<number | null>(null)
 
 const visitDate = ref(dateInputToday())
 const inrValue = ref<number | null>(null)
@@ -78,6 +82,43 @@ const sideEffectOptions = [
 const selectedSideEffects = ref<string[]>([])
 
 async function loadDefaults() {
+  loadingSuggestion.value = false
+  doseOptionsError.value = null
+  doseOptionsHint.value = null
+  doseOptions.value = []
+  selectedDoseOptionIndex.value = null
+  suggestion.value = null
+
+  if (props.editVisit) {
+    isEditMode.value = true
+    editingVisitId.value = props.editVisit.id
+    visitDate.value = props.editVisit.visitDate
+    inrValue.value = props.editVisit.inrValue ?? null
+    inrSource.value = (props.editVisit.inrSource as typeof inrSource.value) ?? 'manual'
+    currentDoseMgday.value = props.editVisit.currentDoseMgday ?? null
+    currentDoseDetail.value = normalizeDoseSchedule(props.editVisit.doseDetail)
+    newDoseMgday.value = props.editVisit.newDoseMgday ?? null
+    newDoseDetail.value = normalizeDoseSchedule(props.editVisit.newDoseDetail)
+    nextAppointment.value = props.editVisit.nextAppointment ?? ''
+    nextInrDue.value = props.editVisit.nextInrDue ?? ''
+    physician.value = props.editVisit.physician ?? ''
+    adherence.value = (props.editVisit.adherence as typeof adherence.value) ?? 'good'
+    notes.value = props.editVisit.notes ?? ''
+    selectedSideEffects.value = props.editVisit.sideEffects ?? []
+
+    const [patientData] = await Promise.all([
+      invoke<PatientDetail>('get_patient_detail', { hn: props.hn }),
+    ])
+    targetLow.value = patientData.patient.targetInrLow
+    targetHigh.value = patientData.patient.targetInrHigh
+    currentDoseSource.value = 'visit'
+    currentDoseSourceText.value = 'ขนาดยาจากการบันทึกครั้งก่อน'
+    return
+  }
+
+  isEditMode.value = false
+  editingVisitId.value = null
+
   try {
     const [latestInr, visits, patientData] = await Promise.all([
       invoke<InrRecord | null>('get_latest_inr', { hn: props.hn }),
@@ -268,8 +309,14 @@ async function handleSubmit() {
       sideEffects: selectedSideEffects.value,
       notes: notes.value || undefined,
     }
-    const visitId = await invoke<number>('save_visit', { visit: input })
-    emit('saved', visitId)
+
+    if (isEditMode.value && editingVisitId.value !== null) {
+      await visitStore.updateVisit(editingVisitId.value, input)
+      emit('updated')
+    } else {
+      const visitId = await invoke<number>('save_visit', { visit: input })
+      emit('saved', visitId)
+    }
     modelValue.value = false
   } catch (e) {
     error.value = String(e)
@@ -289,7 +336,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
     <div v-if="modelValue" class="panel-overlay" @click.self="modelValue = false">
       <div class="visit-panel card">
         <div class="panel-header">
-          <h3 class="h4">บันทึกการทำคลินิก</h3>
+          <h3 class="h4">{{ isEditMode ? 'แก้ไขประวัติการทำคลินิก' : 'บันทึกการทำคลินิก' }}</h3>
           <button class="btn btn-ghost" @click="modelValue = false"><X :size="18" /></button>
         </div>
 
@@ -398,7 +445,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
         <div class="panel-footer">
           <button class="btn btn-ghost" @click="modelValue = false">ยกเลิก</button>
           <button class="btn btn-primary" @click="handleSubmit" :disabled="saving">
-            {{ saving ? 'กำลังบันทึก...' : 'บันทึก & เปิดใบพิมพ์' }}
+            {{ saving ? 'กำลังบันทึก...' : (isEditMode ? 'บันทึกการเปลี่ยนแปลง' : 'บันทึก & เปิดใบพิมพ์') }}
           </button>
         </div>
       </div>

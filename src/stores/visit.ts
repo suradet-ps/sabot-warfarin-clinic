@@ -23,6 +23,11 @@ export const useVisitStore = defineStore('visit', () => {
     return id
   }
 
+  async function updateVisit(visitId: number, input: VisitInput): Promise<void> {
+    await invoke('update_visit', { visitId, visit: input })
+    await fetchVisits(input.hn)
+  }
+
   async function deleteVisit(visitId: number, hn: string) {
     await invoke('delete_visit', { visitId })
     await fetchVisits(hn)
@@ -37,5 +42,5 @@ export const useVisitStore = defineStore('visit', () => {
     })
   }
 
-  return { visits, currentSuggestion, loading, fetchVisits, saveVisit, deleteVisit, getSuggestion }
+  return { visits, currentSuggestion, loading, fetchVisits, saveVisit, updateVisit, deleteVisit, getSuggestion }
 })

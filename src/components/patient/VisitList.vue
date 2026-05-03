@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-vue-next'
 import type { WfVisit } from '#/types/visit'
 import { formatThaiDate, normalizeDoseSchedule, doseDayLabels, doseDayKeys } from '#/utils/clinic'
 import { useVisitStore } from '#/stores/visit'
@@ -8,7 +8,7 @@ import ConfirmDialog from '#/components/shared/ConfirmDialog.vue'
 
 const props = defineProps<{ visits: WfVisit[]; hn: string }>()
 const visitStore = useVisitStore()
-const emit = defineEmits<{ (e: 'deleted'): void }>()
+const emit = defineEmits<{ (e: 'deleted'): void; (e: 'edit', visit: WfVisit): void }>()
 
 const expandedIds = ref<Set<number>>(new Set())
 const deleteTargetId = ref<number | null>(null)
@@ -27,6 +27,10 @@ function toggleExpand(id: number) {
 
 function confirmDelete(id: number) {
   deleteTargetId.value = id
+}
+
+function handleEdit(visit: WfVisit) {
+  emit('edit', visit)
 }
 
 async function handleConfirmedDelete() {
@@ -69,6 +73,9 @@ function adherenceBadgeClass(a?: string | null) {
           </span>
         </div>
         <div class="visit-actions">
+          <button class="btn-icon" title="แก้ไข" @click.stop="handleEdit(v)">
+            <Pencil :size="14" />
+          </button>
           <button class="btn-icon" title="ลบ" @click.stop="confirmDelete(v.id)">
             <Trash2 :size="14" />
           </button>

@@ -36,6 +36,7 @@ const ttr = ref<number | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const visitPanelOpen = ref(false)
+const editingVisit = ref<WfVisit | null>(null)
 const statusModalOpen = ref(false)
 const appointmentTimelineKey = ref(0)
 
@@ -63,7 +64,20 @@ const fullName = computed(() => patientFullName(patientDetail.value?.hosxpInfo))
 
 async function onVisitSaved(visitId: number) {
   visitPanelOpen.value = false
+  editingVisit.value = null
   await router.push(`/slip/${visitId}`)
+}
+
+function handleEditVisit(visit: WfVisit) {
+  editingVisit.value = visit
+  visitPanelOpen.value = true
+}
+
+function handleVisitUpdated() {
+  visitPanelOpen.value = false
+  editingVisit.value = null
+  void refreshVisits()
+  void loadPatient()
 }
 
 async function refreshVisits() {
@@ -154,7 +168,7 @@ onMounted(() => { void loadPatient() })
           />
         </template>
 
-        <VisitList v-else-if="activeTab === 'visits'" :visits="visits" :hn="hn" @deleted="refreshVisits" />
+        <VisitList v-else-if="activeTab === 'visits'" :visits="visits" :hn="hn" @deleted="refreshVisits" @edit="handleEditVisit" />
 
         <DispensingTable
           v-else-if="activeTab === 'dispensing'"
@@ -171,7 +185,7 @@ onMounted(() => { void loadPatient() })
       <p class="body-sm">ไม่พบข้อมูลผู้ป่วย HN: {{ hn }}</p>
     </div>
 
-    <VisitFormPanel v-model="visitPanelOpen" :hn="hn" @saved="onVisitSaved" />
+    <VisitFormPanel v-model="visitPanelOpen" :hn="hn" :edit-visit="editingVisit" @saved="onVisitSaved" @updated="handleVisitUpdated" />
 
     <StatusChangeModal
       v-if="statusModalOpen && patientDetail"
