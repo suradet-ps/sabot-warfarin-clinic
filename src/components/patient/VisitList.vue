@@ -132,8 +132,12 @@ function adherenceBadgeClass(a?: string | null) {
   background: transparent;
   color: var(--color-slate);
   cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
 }
-.btn-icon:hover { background: var(--color-surface); color: var(--color-brand-red); }
+.btn-icon:hover {
+  background: var(--color-brand-red-light);
+  color: var(--color-brand-red-dark);
+}
 .visit-detail { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: 1px solid var(--color-hairline-soft); }
 .detail-row { display: flex; gap: var(--spacing-sm); align-items: flex-start; }
 .dose-mini-grid { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
