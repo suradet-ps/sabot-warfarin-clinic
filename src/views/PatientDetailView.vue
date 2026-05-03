@@ -6,7 +6,6 @@ import { Activity, CalendarDays, FileClock, FilePenLine, Pill, ShieldAlert } fro
 import AdverseEventList from '#/components/patient/AdverseEventList.vue'
 import AppointmentTimeline from '#/components/patient/AppointmentTimeline.vue'
 import DispensingTable from '#/components/patient/DispensingTable.vue'
-import DoseCalculatorPanel from '#/components/patient/DoseCalculatorPanel.vue'
 import InrTrendChart from '#/components/patient/InrTrendChart.vue'
 import StatusChangeModal from '#/components/patient/StatusChangeModal.vue'
 import VisitList from '#/components/patient/VisitList.vue'
@@ -143,11 +142,6 @@ onMounted(() => { void loadPatient() })
         <template v-if="activeTab === 'inr'">
           <InrTrendChart
             :inr-records="patientDetail.inrHistory ?? []"
-            :target-low="patientDetail.patient.targetInrLow"
-            :target-high="patientDetail.patient.targetInrHigh"
-          />
-          <DoseCalculatorPanel
-            :hn="hn"
             :target-low="patientDetail.patient.targetInrLow"
             :target-high="patientDetail.patient.targetInrHigh"
           />
