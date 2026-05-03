@@ -24,7 +24,7 @@ fn round_to_half_mg(value: f64) -> f64 {
 /// | 5.0 - 8.9   | Hold 1-2d, Vit K, -10% | hold | 3-7 d |
 /// | >= 9.0      | Hold 1-2d, Vit K 1-10mg, -10% | hold | 1-3 d |
 pub fn suggest_dose(
-  current_dose: f64,
+  current_dose_weekly: f64,
   inr: f64,
   _target_low: f64,
   _target_high: f64,
@@ -81,11 +81,11 @@ pub fn suggest_dose(
       )
     };
 
-  let suggested_dose_mgday =
-    round_to_half_mg(current_dose * (1.0 + adjustment_percent / 100.0)).max(0.0);
+  let suggested_dose_weekly =
+    round_to_half_mg(current_dose_weekly * (1.0 + adjustment_percent / 100.0)).max(0.0);
 
   DoseSuggestion {
-    suggested_dose_mgday,
+    suggested_dose_mgweek: suggested_dose_weekly,
     adjustment_percent,
     recommendation: recommendation.to_string(),
     urgency: urgency.to_string(),
@@ -172,80 +172,78 @@ mod tests {
 
   #[test]
   fn suggest_dose_in_range_returns_no_change() {
-    let result = suggest_dose(5.0, 2.5, 2.0, 3.0);
+    let result = suggest_dose(35.0, 2.5, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, 0.0);
     assert_eq!(result.urgency, "normal");
-    assert_eq!(result.suggested_dose_mgday, 5.0);
+    assert_eq!(result.suggested_dose_mgweek, 35.0);
     assert_eq!(result.recheck_days, 35);
   }
 
   #[test]
   fn suggest_dose_above_3_0_decreases_7_5_percent() {
-    let result = suggest_dose(5.0, 3.3, 2.0, 3.0);
+    let result = suggest_dose(35.0, 3.3, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, -7.5);
     assert_eq!(result.urgency, "caution");
-    // 5.0 * 0.925 = 4.625 → rounded to 4.5
-    assert_eq!(result.suggested_dose_mgday, 4.5);
+    // 35.0 * 0.925 = 32.375 → rounded to 32.5
+    assert_eq!(result.suggested_dose_mgweek, 32.5);
   }
 
   #[test]
   fn suggest_dose_above_3_0_still_decreases() {
-    let result = suggest_dose(5.0, 3.7, 2.0, 3.0);
+    let result = suggest_dose(35.0, 3.7, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, -7.5);
     assert_eq!(result.urgency, "caution");
-    // 5.0 * 0.925 = 4.625 → rounded to 4.5
-    assert_eq!(result.suggested_dose_mgday, 4.5);
+    assert_eq!(result.suggested_dose_mgweek, 32.5);
   }
 
   #[test]
   fn suggest_dose_4_to_5_hold_and_reduce_10() {
-    let result = suggest_dose(5.0, 4.5, 2.0, 3.0);
+    let result = suggest_dose(35.0, 4.5, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, -10.0);
     assert_eq!(result.urgency, "hold");
-    // 5.0 * 0.90 = 4.5
-    assert_eq!(result.suggested_dose_mgday, 4.5);
+    // 35.0 * 0.90 = 31.5
+    assert_eq!(result.suggested_dose_mgweek, 31.5);
     assert_eq!(result.recheck_days, 7);
   }
 
   #[test]
   fn suggest_dose_over_5_hold_vit_k() {
-    let result = suggest_dose(5.0, 5.5, 2.0, 3.0);
+    let result = suggest_dose(35.0, 5.5, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, -10.0);
     assert_eq!(result.urgency, "hold");
-    // 5.0 * 0.90 = 4.5
-    assert_eq!(result.suggested_dose_mgday, 4.5);
+    assert_eq!(result.suggested_dose_mgweek, 31.5);
     assert_eq!(result.recheck_days, 5);
   }
 
   #[test]
   fn suggest_dose_1_5_to_1_9_increases_7_5_percent() {
-    let result = suggest_dose(5.0, 1.8, 2.0, 3.0);
+    let result = suggest_dose(35.0, 1.8, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, 7.5);
     assert_eq!(result.urgency, "caution");
-    // 5.0 * 1.075 = 5.375 → rounded to 5.5
-    assert_eq!(result.suggested_dose_mgday, 5.5);
+    // 35.0 * 1.075 = 37.625 → rounded to 37.5
+    assert_eq!(result.suggested_dose_mgweek, 37.5);
   }
 
   #[test]
   fn suggest_dose_below_1_5_increases_15_percent() {
-    let result = suggest_dose(5.0, 1.3, 2.0, 3.0);
+    let result = suggest_dose(35.0, 1.3, 2.0, 3.0);
     assert_eq!(result.adjustment_percent, 15.0);
     assert_eq!(result.urgency, "urgent");
-    // 5.0 * 1.15 = 5.75 → rounded to 6.0
-    assert_eq!(result.suggested_dose_mgday, 6.0);
+    // 35.0 * 1.15 = 40.25 → rounded to 40.5 (round to nearest 0.5)
+    assert_eq!(result.suggested_dose_mgweek, 40.5);
   }
 
   #[test]
   fn suggest_dose_rounds_to_half_mg() {
-    // 3.0 * 1.075 = 3.225 → rounds to 3.0
-    let result = suggest_dose(3.0, 1.8, 2.0, 3.0);
-    assert_eq!(result.suggested_dose_mgday, 3.0);
+    // 28.0 * 1.075 = 30.1 → rounds to 30.0
+    let result = suggest_dose(28.0, 1.8, 2.0, 3.0);
+    assert_eq!(result.suggested_dose_mgweek, 30.0);
   }
 
   #[test]
   fn suggest_dose_zero_dose_stays_zero() {
     let result = suggest_dose(0.0, 1.0, 2.0, 3.0);
-    assert_eq!(result.suggested_dose_mgday, 0.0);
+    assert_eq!(result.suggested_dose_mgweek, 0.0);
   }
 
   // ── calculate_ttr tests ─────────────────────────────────────────────────

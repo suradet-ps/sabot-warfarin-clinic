@@ -59,7 +59,7 @@ pub struct VisitInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DoseSuggestion {
-  pub suggested_dose_mgday: f64,
+  pub suggested_dose_mgweek: f64,
   pub adjustment_percent: f64,
   pub recommendation: String,
   pub urgency: String,

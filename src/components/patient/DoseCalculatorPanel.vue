@@ -95,7 +95,7 @@ onMounted(() => { void loadDefaults() })
 
     <div v-if="suggestion" class="suggestion-box card">
       <div class="suggestion-header">
-        <span class="body-sm-medium">ขนาดยาที่แนะนำ: <strong>{{ suggestion.suggestedDoseMgday.toFixed(1) }} mg/วัน</strong></span>
+        <span class="body-sm-medium">ขนาดยาที่แนะนำ: <strong>{{ suggestion.suggestedDoseMgweek.toFixed(1) }} mg/สัปดาห์</strong></span>
         <span v-if="urgencyInfo" :class="['badge', urgencyInfo.className]">{{ urgencyInfo.text }}</span>
       </div>
       <p class="body-sm" style="color: var(--color-slate)">{{ suggestion.recommendation }}</p>

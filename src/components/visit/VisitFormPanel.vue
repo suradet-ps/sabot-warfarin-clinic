@@ -118,30 +118,31 @@ async function fetchSuggestion() {
   selectedDoseOptionIndex.value = null
 
   try {
+    const currentWeekly = currentDoseMgday.value * 7
+
     suggestion.value = await invoke<DoseSuggestion>('suggest_dose', {
-      currentDose: currentDoseMgday.value,
+      currentDose: currentWeekly,
       currentInr: inrValue.value,
       targetLow: targetLow.value,
       targetHigh: targetHigh.value,
     })
     if (suggestion.value) {
-      const suggestedDaily = suggestion.value.suggestedDoseMgday
+      const suggestedWeekly = suggestion.value.suggestedDoseMgweek
 
-      if (suggestedDaily === currentDoseMgday.value) {
-        newDoseMgday.value = suggestedDaily
+      if (Math.abs(suggestedWeekly - currentWeekly) < 0.25) {
+        newDoseMgday.value = currentWeekly / 7
         doseOptionsError.value = 'ขนาดยาคงที่ (หลังปัดเศษ) - ไม่ต้องปรับยา'
         doseOptions.value = []
       } else {
-        newDoseMgday.value = suggestedDaily
+        newDoseMgday.value = suggestedWeekly / 7
 
-        const weeklyDose = suggestedDaily * 7
         const daysUntilAppointment = nextAppointment.value
           ? Math.max(1, Math.ceil((new Date(nextAppointment.value).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
           : 28
         const startDayOfWeek = new Date().getDay()
 
         const options = await generateDoseOptions(
-          weeklyDose,
+          suggestedWeekly,
           availablePills.value,
           allowHalf.value,
           specialDayPattern.value,
@@ -281,7 +282,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
               {{ loadingSuggestion ? 'กำลังคำนวณ...' : 'คำนวณขนาดยา' }}
             </button>
             <span v-if="suggestion" class="body-sm">
-              แนะนำ: <strong>{{ (suggestion.suggestedDoseMgday * 7).toFixed(1) }} mg/สัปดาห์</strong> ({{ suggestion.suggestedDoseMgday.toFixed(1) }} mg/วัน) &mdash; {{ suggestion.recommendation }}
+              แนะนำ: <strong>{{ suggestion.suggestedDoseMgweek.toFixed(1) }} mg/สัปดาห์</strong> &mdash; {{ suggestion.recommendation }}
             </span>
           </div>
 

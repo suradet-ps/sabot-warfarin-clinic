@@ -49,7 +49,7 @@ export interface VisitInput {
 }
 
 export interface DoseSuggestion {
-  suggestedDoseMgday: number
+  suggestedDoseMgweek: number
   adjustmentPercent: number
   recommendation: string
   urgency: 'normal' | 'caution' | 'urgent' | 'hold'
