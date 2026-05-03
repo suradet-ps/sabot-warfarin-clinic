@@ -131,6 +131,7 @@ async function fetchSuggestion() {
 
       if (Math.abs(suggestedWeekly - currentWeekly) < 0.25) {
         newDoseMgday.value = currentWeekly / 7
+        newDoseDetail.value = JSON.parse(JSON.stringify(currentDoseDetail.value))
         doseOptionsError.value = 'ขนาดยาคงที่ (หลังปัดเศษ) - ไม่ต้องปรับยา'
         doseOptions.value = []
       } else {
@@ -257,7 +258,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
           </div>
 
           <div class="form-section">
-            <p class="caption label">ตารางยาเดิม (mg/วัน)</p>
+            <p class="caption label">ตารางยาเดิม</p>
             <div class="dose-source-card">
               <div>
                 <p class="body-sm-medium">{{ currentDoseSource === 'hosxp' ? 'ขนาดยาเดิมจาก HosXP' : currentDoseSource === 'visit' ? 'ขนาดยาเดิมจาก visit ล่าสุด' : 'กรอกขนาดยาเดิมเอง' }}</p>
@@ -301,7 +302,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
           </div>
 
           <div class="form-section">
-            <p class="caption label">ตารางยาใหม่ (mg/วัน)</p>
+            <p class="caption label">ตารางยาใหม่</p>
             <DayDoseTable v-model="newDoseDetail" />
             <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ newDoseAvg.toFixed(2) }} mg/วัน | รวม {{ newDoseWeek.toFixed(1) }} mg/week</p>
           </div>
