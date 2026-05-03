@@ -371,7 +371,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
               </button>
             </div>
             <DayDoseTable v-model="currentDoseDetail" />
-            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ currentDoseAvg.toFixed(2) }} mg/วัน | รวม {{ currentDoseWeek.toFixed(1) }} mg/week</p>
+            <p class="caption" style="color: var(--color-slate)">รวม: {{ currentDoseWeek.toFixed(1) }} mg/สัปดาห์ (เฉลี่ย {{ currentDoseAvg.toFixed(2) }} mg/วัน)</p>
             <p v-if="latestHosxpVisit?.parseNotes.length" class="caption dose-warning">{{ latestHosxpVisit.parseNotes.join(' | ') }}</p>
           </div>
 
@@ -402,7 +402,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
           <div class="form-section">
             <p class="caption label">ตารางยาใหม่</p>
             <DayDoseTable v-model="newDoseDetail" />
-            <p class="caption" style="color: var(--color-slate)">เฉลี่ย: {{ newDoseAvg.toFixed(2) }} mg/วัน | รวม {{ newDoseWeek.toFixed(1) }} mg/week</p>
+            <p class="caption" style="color: var(--color-slate)">รวม: {{ newDoseWeek.toFixed(1) }} mg/สัปดาห์ (เฉลี่ย {{ newDoseAvg.toFixed(2) }} mg/วัน)</p>
           </div>
 
           <div class="form-row">

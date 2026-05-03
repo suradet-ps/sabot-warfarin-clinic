@@ -66,7 +66,7 @@ function adherenceBadgeClass(a?: string | null) {
           <span class="body-sm-medium">{{ formatThaiDate(v.visitDate) }}</span>
           <span v-if="v.inrValue != null" class="badge badge-tag-coral">INR {{ v.inrValue.toFixed(1) }}</span>
           <span v-if="v.newDoseMgday != null" class="caption" style="color: var(--color-slate)">
-            ยา {{ v.newDoseMgday.toFixed(1) }} mg/วัน
+            ยา {{ (v.newDoseMgday * 7).toFixed(1) }} mg/สัปดาห์
           </span>
           <span v-if="v.adherence" :class="['badge', adherenceBadgeClass(v.adherence)]">
             {{ adherenceLabels[v.adherence] ?? v.adherence }}
