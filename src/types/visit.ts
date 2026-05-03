@@ -1,3 +1,5 @@
+import type { RegimenOption } from '#/types/dose'
+
 export interface DoseSchedule {
   mon: number
   tue: number
@@ -40,6 +42,7 @@ export interface WfVisit {
   createdBy?: string
   createdAt: string
   totalPillsSummary?: TotalPillsSummary
+  selectedDoseOption?: RegimenOption
 }
 
 export interface VisitInput {
@@ -60,6 +63,7 @@ export interface VisitInput {
   sideEffects?: string[]
   adherence?: string
   createdBy?: string
+  selectedDoseOption?: RegimenOption
 }
 
 export interface DoseSuggestion {

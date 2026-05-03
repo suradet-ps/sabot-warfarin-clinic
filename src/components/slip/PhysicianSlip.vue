@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, nextTick } from 'vue'
 import { useSettingsStore } from '#/stores/settings'
+import RegimenOptionCard from '#/components/visit/RegimenOptionCard.vue'
 import type { PatientDetail } from '#/types/patient'
 import type { WfVisit } from '#/types/visit'
 import { calculateAge, doseDayKeys, doseDayLabels, formatThaiDate, normalizeDoseSchedule, scheduleWeeklyTotal, scheduleAverageDose } from '#/utils/clinic'
+import { createRegimenOptionSnapshot } from '#/utils/regimen'
 import { createChart, LineSeries } from 'lightweight-charts'
 
 const props = defineProps<{ visit: WfVisit; patient: PatientDetail; ttr: number | null }>()
@@ -106,55 +108,17 @@ const p = computed(() => props.patient.patient)
 const age = computed(() => (info.value ? calculateAge(info.value.birthday) : null))
 const currentDoseSchedule = computed(() => normalizeDoseSchedule(props.visit.doseDetail))
 const newDoseSchedule = computed(() => normalizeDoseSchedule(props.visit.newDoseDetail))
-const doseDescription = computed(() => props.visit.newDoseDescription || '')
+const selectedDoseOption = computed(() => props.visit.selectedDoseOption ?? createRegimenOptionSnapshot({
+  schedule: props.visit.newDoseDetail,
+  visitDate: props.visit.visitDate,
+  nextAppointment: props.visit.nextAppointment,
+}))
 
 const adherenceLabel: Record<string, string> = {
   good: 'ดี',
   fair: 'พอใช้',
   poor: 'ไม่ดี',
 }
-
-const doseInstructions = computed(() => {
-  const schedule = newDoseSchedule.value
-
-  const pillsByDay: { day: string; dose: number; pills: string }[] = []
-
-  for (const dayKey of doseDayKeys) {
-    const dose = schedule[dayKey] || 0
-    const dayLabel = doseDayLabels[dayKey]
-
-    let pillsText = '-'
-    if (dose > 0) {
-      const pillList: string[] = []
-      if (dose >= 5) pillList.push(`${Math.floor(dose / 5)} เม็ด (5 mg)`)
-      const rem5 = dose % 5
-      if (rem5 >= 3) pillList.push(`${Math.floor(rem5 / 3)} เม็ด (3 mg)`)
-      const rem3 = rem5 % 3
-      if (rem3 >= 2) pillList.push('1 เม็ด (2 mg)')
-      if (dose - Math.floor(dose) >= 0.4) pillList.push('ครึ่งเม็ด (1 mg)')
-      pillsText = pillList.join(' + ')
-    } else {
-      pillsText = 'หยุดยา'
-    }
-
-    pillsByDay.push({ day: dayLabel, dose, pills: pillsText })
-  }
-
-  const totalMg = scheduleWeeklyTotal(schedule)
-
-  const visitDate = props.visit.visitDate
-  const nextAppt = props.visit.nextAppointment
-  const dayCount = nextAppt && visitDate 
-    ? Math.ceil((new Date(nextAppt).getTime() - new Date(visitDate).getTime()) / (1000 * 60 * 60 * 24)) + 1
-    : 7
-
-  return {
-    pillsByDay,
-    totalDays: dayCount,
-    totalMg,
-    hasDateRange: !!(visitDate && nextAppt)
-  }
-})
 
 function ttrClass(v: number | null): string {
   if (v === null) return ''
@@ -222,37 +186,9 @@ function ttrClass(v: number | null): string {
         </tbody>
       </table>
 
-<div v-if="doseInstructions" class="dose-instructions">
-        <span class="label">วิธีกินยา{{ doseInstructions.hasDateRange ? ` (ตั้งแต่วันที่ ${formatThaiDate(visit.visitDate)} ถึง ${formatThaiDate(visit.nextAppointment)})` : '' }}</span>
-        
-        <div v-if="doseDescription" class="dose-pattern">
-          <strong>{{ doseDescription }}</strong>
-        </div>
-
-        <table class="instruction-table">
-          <thead>
-            <tr>
-              <th v-for="item in doseInstructions.pillsByDay" :key="item.day">{{ item.day }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td v-for="item in doseInstructions.pillsByDay" :key="item.day">{{ item.pills }}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <div v-if="doseInstructions.hasDateRange && visit.nextAppointment" class="pill-summary">
-          <div class="summary-title">{{ visit.totalPillsSummary?.header || 'รวมยาถึงวันนัด:' }}</div>
-          <div v-if="visit.totalPillsSummary?.pillLines?.length" class="pill-lines">
-            <div v-for="line in visit.totalPillsSummary.pillLines" :key="line.mg" class="pill-line">
-              {{ line.mg }}mg: {{ line.dispensedCount }} เม็ด{{ line.usageNote }}
-            </div>
-          </div>
-          <div v-else class="pill-line">ไม่ต้องจ่ายยา</div>
-        </div>
-        
-        <div class="instruction-summary">รวม {{ doseInstructions.totalDays }} วัน ขนาดยารวม {{ doseInstructions.totalMg.toFixed(1) }} mg</div>
+      <div class="dose-instructions">
+        <span class="label">วิธีกินยาที่เลือกจากหน้าบันทึกการทำคลินิก</span>
+        <RegimenOptionCard :option="selectedDoseOption" label="การ์ดวิธีกินยา" selected />
       </div>
     </div>
 
@@ -405,62 +341,13 @@ function ttrClass(v: number | null): string {
 }
 
 .dose-instructions {
-  padding: var(--spacing-md);
-  background: var(--color-yellow-light);
-  border-radius: var(--rounded-md);
-  border: 1px solid var(--color-hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
 }
 
 .dose-instructions .label {
   display: block;
-  font-size: var(--typography-body-sm-size);
-  color: var(--color-slate);
-  margin-bottom: var(--spacing-xs);
-}
-
-.instruction-detail {
-  font-size: var(--typography-body-sm-size);
-  color: var(--color-ink);
-  margin-bottom: var(--spacing-sm);
-}
-
-.instruction-summary {
-  font-size: var(--typography-body-sm-size);
-  font-weight: 500;
-  color: var(--color-charcoal);
-}
-
-.dose-pattern {
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-teal-light);
-  border-radius: var(--rounded-md);
-  margin-bottom: var(--spacing-sm);
-  font-size: var(--typography-body-sm-size);
-  color: var(--color-moss-dark);
-}
-
-.pill-summary {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border-radius: var(--rounded-md);
-  border: 1px solid var(--color-hairline);
-}
-
-.summary-title {
-  font-weight: 600;
-  font-size: var(--typography-body-sm-size);
-  color: var(--color-ink);
-  margin-bottom: var(--spacing-xs);
-}
-
-.pill-lines {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xxs);
-}
-
-.pill-line {
   font-size: var(--typography-body-sm-size);
   color: var(--color-slate);
 }

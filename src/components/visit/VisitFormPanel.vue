@@ -20,6 +20,13 @@ import {
   scheduleAverageDose,
   scheduleWeeklyTotal,
 } from '#/utils/clinic'
+import {
+  createRegimenOptionSnapshot,
+  findMatchingRegimenOption,
+  getDosePeriodDays,
+  jsDayToDoseDayIndex,
+  regimenOptionMatchesSchedule,
+} from '#/utils/regimen'
 
 const { generateDoseOptions, DEFAULT_AVAILABLE_PILLS } = useDoseCalculator()
 
@@ -52,9 +59,9 @@ const currentDoseSource = ref<'visit' | 'hosxp' | 'manual'>('manual')
 const currentDoseSourceText = ref('')
 const doseOptions = ref<RegimenOption[]>([])
 const selectedDoseOptionIndex = ref<number | null>(null)
-const selectedDoseDescription = ref<string>('')
 const loadingDoseOptions = ref(false)
 const doseOptionsError = ref<string | null>(null)
+const doseOptionsHint = ref<string | null>(null)
 const availablePills = ref<AvailablePills>({ ...DEFAULT_AVAILABLE_PILLS })
 const allowHalf = ref(true)
 const specialDayPattern = ref<'fri-sun' | 'mon-wed-fri'>('fri-sun')
@@ -98,6 +105,7 @@ async function loadDefaults() {
     }
     targetLow.value = patientData.patient.targetInrLow
     targetHigh.value = patientData.patient.targetInrHigh
+    applyCurrentDoseAsNew()
   } catch {
     // non-critical
   }
@@ -108,6 +116,18 @@ function applyHosxpDose(visit: NonNullable<typeof latestHosxpVisit.value>) {
   currentDoseMgday.value = visit.mgPerDayAverage
   currentDoseSource.value = 'hosxp'
   currentDoseSourceText.value = `ดึงจาก HosXP วันที่ ${formatThaiDate(visit.vstdate)}${visit.usageTextSummary !== '-' ? `: ${visit.usageTextSummary}` : ''}`
+  applyCurrentDoseAsNew()
+}
+
+function applyCurrentDoseAsNew() {
+  newDoseDetail.value = normalizeDoseSchedule(currentDoseDetail.value)
+  newDoseMgday.value = currentDoseMgday.value
+  selectedDoseOptionIndex.value = null
+}
+
+function autoSelectMatchingDoseOption() {
+  const matched = findMatchingRegimenOption(doseOptions.value, newDoseDetail.value)
+  selectedDoseOptionIndex.value = matched?.index ?? null
 }
 
 async function fetchSuggestion() {
@@ -115,6 +135,7 @@ async function fetchSuggestion() {
   loadingSuggestion.value = true
   loadingDoseOptions.value = true
   doseOptionsError.value = null
+  doseOptionsHint.value = null
   doseOptions.value = []
   selectedDoseOptionIndex.value = null
 
@@ -129,33 +150,33 @@ async function fetchSuggestion() {
     })
     if (suggestion.value) {
       const suggestedWeekly = suggestion.value.suggestedDoseMgweek
+      const unchanged = Math.abs(suggestedWeekly - currentWeekly) < 0.25
+      const targetWeekly = unchanged ? currentWeekly : suggestedWeekly
 
-      if (Math.abs(suggestedWeekly - currentWeekly) < 0.25) {
+      if (unchanged) {
         newDoseMgday.value = currentWeekly / 7
         newDoseDetail.value = JSON.parse(JSON.stringify(currentDoseDetail.value))
-        doseOptionsError.value = 'ขนาดยาคงที่ (หลังปัดเศษ) - ไม่ต้องปรับยา'
-        doseOptions.value = []
+        doseOptionsHint.value = 'ขนาดยาคงที่หลังปัดเศษ ระบบใส่ขนาดยาเดิมให้อัตโนมัติ และยังสามารถเลือกการ์ดวิธีกินยาที่มี mg/week เท่ากันได้'
       } else {
         newDoseMgday.value = suggestedWeekly / 7
+      }
 
-        const daysUntilAppointment = nextAppointment.value
-          ? Math.max(1, Math.ceil((new Date(nextAppointment.value).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
-          : 28
-        const startDayOfWeek = new Date().getDay()
+      const daysUntilAppointment = getDosePeriodDays(visitDate.value, nextAppointment.value) ?? 28
+      const startDayOfWeek = jsDayToDoseDayIndex(new Date(`${visitDate.value}T00:00:00`).getDay())
 
-        const options = await generateDoseOptions(
-          suggestedWeekly,
-          availablePills.value,
-          allowHalf.value,
-          specialDayPattern.value,
-          daysUntilAppointment,
-          startDayOfWeek
-        )
-        doseOptions.value = options
+      const options = await generateDoseOptions(
+        targetWeekly,
+        availablePills.value,
+        allowHalf.value,
+        specialDayPattern.value,
+        daysUntilAppointment,
+        startDayOfWeek,
+      )
+      doseOptions.value = options
+      autoSelectMatchingDoseOption()
 
-        if (options.length === 0) {
-          doseOptionsError.value = 'ไม่พบตัวเลือกที่เหมาะสม ลองปรับการตั้งค่ายา'
-        }
+      if (options.length === 0) {
+        doseOptionsError.value = 'ไม่พบตัวเลือกที่เหมาะสม ลองปรับการตั้งค่ายา'
       }
     }
   } catch (e) {
@@ -190,12 +211,38 @@ const currentDoseAvg = computed(() => scheduleAverageDose(currentDoseDetail.valu
 const currentDoseWeek = computed(() => scheduleWeeklyTotal(currentDoseDetail.value))
 const newDoseAvg = computed(() => scheduleAverageDose(newDoseDetail.value))
 const newDoseWeek = computed(() => scheduleWeeklyTotal(newDoseDetail.value))
+const activeDoseOption = computed<RegimenOption | null>(() => {
+  if (selectedDoseOptionIndex.value !== null) {
+    const selectedOption = doseOptions.value[selectedDoseOptionIndex.value] ?? null
+    if (selectedOption && regimenOptionMatchesSchedule(selectedOption, newDoseDetail.value)) {
+      return selectedOption
+    }
+  }
+
+  return findMatchingRegimenOption(doseOptions.value, newDoseDetail.value)?.option ?? null
+})
+
+const regimenSnapshot = computed<RegimenOption>(() => createRegimenOptionSnapshot({
+  schedule: newDoseDetail.value,
+  visitDate: visitDate.value,
+  nextAppointment: nextAppointment.value,
+  baseOption: activeDoseOption.value,
+}))
+
+const doseChanged = computed(() => Math.abs(newDoseWeek.value - currentDoseWeek.value) >= 0.25)
 
 watch(currentDoseDetail, () => {
   currentDoseMgday.value = currentDoseAvg.value
 }, { deep: true })
 watch(newDoseDetail, () => {
   newDoseMgday.value = newDoseAvg.value
+  const selectedOption = selectedDoseOptionIndex.value !== null
+    ? doseOptions.value[selectedDoseOptionIndex.value] ?? null
+    : null
+
+  if (selectedOption && !regimenOptionMatchesSchedule(selectedOption, newDoseDetail.value)) {
+    selectedDoseOptionIndex.value = null
+  }
 }, { deep: true })
 
 async function handleSubmit() {
@@ -211,7 +258,9 @@ async function handleSubmit() {
       doseDetail: currentDoseDetail.value,
       newDoseMgday: newDoseMgday.value ?? undefined,
       newDoseDetail: newDoseDetail.value,
-      doseChanged: newDoseMgday.value !== currentDoseMgday.value,
+      newDoseDescription: regimenSnapshot.value.description,
+      selectedDoseOption: regimenSnapshot.value,
+      doseChanged: doseChanged.value,
       nextAppointment: nextAppointment.value || undefined,
       nextInrDue: nextInrDue.value || undefined,
       physician: physician.value || undefined,
@@ -297,6 +346,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
               @select="handleSelectDoseOption"
             />
             <p v-if="doseOptionsError" class="caption" style="color: var(--color-brand-coral)">{{ doseOptionsError }}</p>
+            <p v-else-if="doseOptionsHint" class="caption" style="color: var(--color-slate)">{{ doseOptionsHint }}</p>
             <p v-if="selectedDoseOptionIndex !== null" class="body-sm-medium" style="color: var(--color-success-accent)">
               ✓ เลือกตัวเลือก {{ selectedDoseOptionIndex + 1 }} แล้ว ตารางยาใหม่จะถูกอัพเดทด้านล่าง
             </p>

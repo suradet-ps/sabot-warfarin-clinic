@@ -13,7 +13,7 @@ use crate::models::{
   inr::InrRecord,
   outcome::{OutcomeInput, WfOutcome},
   patient::{EnrollmentInput, WfPatient},
-  visit::{DoseSchedule, VisitInput, WfVisit},
+  visit::{DoseSchedule, RegimenOptionSnapshot, TotalPillsSummary, VisitInput, WfVisit},
 };
 
 fn calculate_pills_summary(
@@ -88,6 +88,22 @@ if lines.is_empty() {
     header,
     pill_lines: lines,
   })
+}
+
+fn selected_option_summary(snapshot: &RegimenOptionSnapshot) -> TotalPillsSummary {
+  TotalPillsSummary {
+    header: snapshot.total_pills_summary.header.clone(),
+    pill_lines: snapshot
+      .total_pills_summary
+      .pill_lines
+      .iter()
+      .map(|line| crate::models::visit::PillLineSummary {
+        mg: line.mg,
+        dispensed_count: line.dispensed_count,
+        usage_note: line.usage_note.clone(),
+      })
+      .collect(),
+  }
 }
 
 // Pool initialisation
@@ -308,15 +324,19 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
     .side_effects
     .as_ref()
     .map(|s| serde_json::to_string(s).unwrap_or_default());
+  let selected_dose_option_json = input
+    .selected_dose_option
+    .as_ref()
+    .map(|option| serde_json::to_string(option).unwrap_or_default());
   let dose_changed = i32::from(input.dose_changed);
 
   let id = sqlx::query(
     "INSERT INTO wf_visits \
          (hn, visit_date, inr_value, inr_source, \
-          current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, \
+          current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
           dose_changed, next_appointment, next_inr_due, \
           physician, notes, side_effects, adherence, created_by, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&input.hn)
   .bind(&input.visit_date)
@@ -326,6 +346,8 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
   .bind(&dose_detail_json)
   .bind(input.new_dose_mgday)
   .bind(&new_dose_detail_json)
+  .bind(&input.new_dose_description)
+  .bind(&selected_dose_option_json)
   .bind(dose_changed)
   .bind(&input.next_appointment)
   .bind(&input.next_inr_due)
@@ -347,7 +369,7 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
 pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisit>> {
   let rows = sqlx::query(
     "SELECT id, hn, visit_date, inr_value, inr_source, \
-         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, \
+         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at \
          FROM wf_visits WHERE hn = ? ORDER BY visit_date DESC",
@@ -375,16 +397,24 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         .ok()
         .flatten()
         .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok());
+      let selected_dose_option = r
+        .try_get::<Option<String>, _>("selected_dose_option")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<RegimenOptionSnapshot>(&s).ok());
       let dose_changed: i32 = r.try_get("dose_changed").unwrap_or(0);
       let visit_date_str: String = r.get("visit_date");
       let next_appt: Option<String> = r.try_get("next_appointment").ok();
-      let _new_dose_desc: Option<String> = r.try_get("new_dose_description").ok();
-
-      let _total_pills_summary = if let (Some(na), Some(nd)) = (&next_appt, &new_dose_detail) {
-        calculate_pills_summary(&visit_date_str, nd, na)
-      } else {
-        None
-      };
+      let total_pills_summary = selected_dose_option
+        .as_ref()
+        .map(selected_option_summary)
+        .or_else(|| {
+          if let (Some(na), Some(nd)) = (&next_appt, &new_dose_detail) {
+            calculate_pills_summary(&visit_date_str, nd, na)
+          } else {
+            None
+          }
+        });
 
       Ok(WfVisit {
         id: r.get("id"),
@@ -406,7 +436,8 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         adherence: r.try_get("adherence").ok(),
         created_by: r.try_get("created_by").ok(),
         created_at: r.get("created_at"),
-        total_pills_summary: None,
+        total_pills_summary,
+        selected_dose_option,
       })
     })
     .collect()
@@ -415,7 +446,7 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
 pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<WfVisit>> {
   let row = sqlx::query(
     "SELECT id, hn, visit_date, inr_value, inr_source, \
-         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, \
+         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at \
          FROM wf_visits WHERE id = ?",
@@ -441,16 +472,26 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       .ok()
       .flatten()
       .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok());
+    let selected_dose_option = r
+      .try_get::<Option<String>, _>("selected_dose_option")
+      .ok()
+      .flatten()
+      .and_then(|s| serde_json::from_str::<RegimenOptionSnapshot>(&s).ok());
     let dose_changed: i32 = r.try_get("dose_changed").unwrap_or(0);
     let visit_date_str: String = r.get("visit_date");
     let next_appt_str: Option<String> = r.try_get("next_appointment").ok();
     let new_dose_desc: Option<String> = r.try_get("new_dose_description").ok();
 
-    let total_pills_summary = if let (Some(vd), Some(na), Some(nd)) = (Some(&visit_date_str), &next_appt_str, &new_dose_detail) {
-      calculate_pills_summary(vd, nd, na)
-    } else {
-      None
-    };
+    let total_pills_summary = selected_dose_option
+      .as_ref()
+      .map(selected_option_summary)
+      .or_else(|| {
+        if let (Some(vd), Some(na), Some(nd)) = (Some(&visit_date_str), &next_appt_str, &new_dose_detail) {
+          calculate_pills_summary(vd, nd, na)
+        } else {
+          None
+        }
+      });
 
     WfVisit {
       id: r.get("id"),
@@ -473,6 +514,7 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       created_by: r.try_get("created_by").ok(),
       created_at: r.get("created_at"),
       total_pills_summary,
+      selected_dose_option,
     }
   }))
 }
