@@ -143,6 +143,18 @@ function ttrClass(v: number | null): string {
   if (v >= 50) return 'ttr-warn'
   return 'ttr-bad'
 }
+
+function daysFromNow(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const targetDate = new Date(dateStr)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  targetDate.setHours(0, 0, 0, 0)
+  const diffMs = targetDate.getTime() - today.getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return `(${Math.abs(diffDays)} วันผ่านไปแล้ว)`
+  return `(+${diffDays} วัน)`
+}
 </script>
 
 <template>
@@ -278,10 +290,11 @@ function ttrClass(v: number | null): string {
       <div class="appointment-info">
         <span class="label">นัดครั้งต่อไป:</span>
         <strong>{{ formatThaiDate(visit.nextAppointment) }}</strong>
+        <span class="days-from-now">{{ daysFromNow(visit.nextAppointment) }}</span>
       </div>
       <div class="signature-area">
         <div class="signature-box">
-          <span class="label">หมายเหตุ/คำแนะนำ</span>
+          <span class="label">Pharmacist Notes</span>
           <div class="sig-line" />
           <div class="sig-line" />
         </div>
@@ -511,6 +524,11 @@ function ttrClass(v: number | null): string {
 
 .appointment-info strong {
   font-size: var(--typography-body-md-size);
+}
+
+.days-from-now {
+  font-size: var(--typography-body-sm-size);
+  color: var(--color-slate);
 }
 
 .signature-area {
