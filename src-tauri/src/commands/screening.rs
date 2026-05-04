@@ -7,7 +7,7 @@ use tauri::State;
 
 use crate::{
   db::{
-    mysql::{search_hosxp_warfarin_patients},
+    mysql::search_hosxp_warfarin_patients,
     sqlite::{AppState, get_all_enrolled_hns},
   },
   models::patient::{SearchFilters, SearchResponse},

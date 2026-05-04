@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use tauri::State;
 
 use crate::db::{
@@ -14,17 +14,13 @@ use crate::encrypt;
 const MYSQL_CONFIG_KEY: &str = "mysql_config";
 const ENCRYPTION_KEY_KEY: &str = "encryption_key";
 
-async fn get_or_create_encryption_key(
-  pool: &sqlx::SqlitePool,
-) -> Result<[u8; 32], String> {
+async fn get_or_create_encryption_key(pool: &sqlx::SqlitePool) -> Result<[u8; 32], String> {
   let existing = get_setting(pool, ENCRYPTION_KEY_KEY)
     .await
     .map_err(|e| e.to_string())?;
 
   if let Some(key_b64) = existing {
-    let key_bytes = BASE64
-      .decode(&key_b64)
-      .map_err(|e| e.to_string())?;
+    let key_bytes = BASE64.decode(&key_b64).map_err(|e| e.to_string())?;
     let mut key = [0u8; 32];
     if key_bytes.len() != 32 {
       return Err("Invalid encryption key length".to_string());
@@ -33,7 +29,7 @@ async fn get_or_create_encryption_key(
     Ok(key)
   } else {
     let key = encrypt::generate_key();
-    let key_b64 = BASE64.encode(&key);
+    let key_b64 = BASE64.encode(key);
     set_setting(pool, ENCRYPTION_KEY_KEY, &key_b64)
       .await
       .map_err(|e| e.to_string())?;
@@ -81,7 +77,9 @@ pub async fn test_mysql_connection(
 /// Returns the MySQL config with decrypted password for UI display/editing.
 /// Tries to decrypt as encrypted format first, falls back to plaintext for backward compatibility.
 #[tauri::command]
-pub async fn get_mysql_config_for_ui(state: State<'_, AppState>) -> Result<Option<DbConfig>, String> {
+pub async fn get_mysql_config_for_ui(
+  state: State<'_, AppState>,
+) -> Result<Option<DbConfig>, String> {
   let stored = match get_setting(&state.pool, MYSQL_CONFIG_KEY)
     .await
     .map_err(|e| e.to_string())?
@@ -91,10 +89,10 @@ pub async fn get_mysql_config_for_ui(state: State<'_, AppState>) -> Result<Optio
   };
 
   // Try encrypted format first
-  if let Ok(key) = get_or_create_encryption_key(&state.pool).await {
-    if let Ok(config) = encrypt::decrypt_json::<DbConfig>(&stored, &key) {
-      return Ok(Some(config));
-    }
+  if let Ok(key) = get_or_create_encryption_key(&state.pool).await
+    && let Ok(config) = encrypt::decrypt_json::<DbConfig>(&stored, &key)
+  {
+    return Ok(Some(config));
   }
 
   // Fallback: try plaintext (backward compatibility)
@@ -127,10 +125,10 @@ pub async fn get_mysql_config_internal(
   };
 
   // Try encrypted format first
-  if let Ok(key) = get_or_create_encryption_key(pool).await {
-    if let Ok(config) = encrypt::decrypt_json::<DbConfig>(&stored, &key) {
-      return Ok(Some(config));
-    }
+  if let Ok(key) = get_or_create_encryption_key(pool).await
+    && let Ok(config) = encrypt::decrypt_json::<DbConfig>(&stored, &key)
+  {
+    return Ok(Some(config));
   }
 
   // Fallback: try plaintext (backward compatibility)

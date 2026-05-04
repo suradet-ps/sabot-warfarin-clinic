@@ -8,8 +8,8 @@ use crate::{
     mysql::{get_dispensing_history, get_hosxp_patient},
     sqlite::{
       AppState, enroll_patient as db_enroll, get_active_patients as db_get_active,
-      get_inr_from_visits, get_patient_by_hn, get_pending_appointments,
-      get_visit_history, update_patient_status as db_update_status,
+      get_inr_from_visits, get_patient_by_hn, get_pending_appointments, get_visit_history,
+      update_patient_status as db_update_status,
     },
   },
   dose::calculator::calculate_ttr,

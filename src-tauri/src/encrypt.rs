@@ -1,8 +1,8 @@
 use aes_gcm::{
-  aead::{Aead, KeyInit},
   Aes256Gcm, Nonce,
+  aead::{Aead, KeyInit},
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
@@ -41,9 +41,7 @@ pub fn encrypt(plaintext: &str, key: &[u8; KEY_SIZE]) -> Result<EncryptedData, S
 pub fn decrypt(encrypted: &EncryptedData, key: &[u8; KEY_SIZE]) -> Result<String, String> {
   let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
 
-  let nonce_bytes = BASE64
-    .decode(&encrypted.nonce)
-    .map_err(|e| e.to_string())?;
+  let nonce_bytes = BASE64.decode(&encrypted.nonce).map_err(|e| e.to_string())?;
   let ciphertext = BASE64
     .decode(&encrypted.ciphertext)
     .map_err(|e| e.to_string())?;
@@ -67,8 +65,7 @@ pub fn decrypt_json<T: for<'de> serde::Deserialize<'de>>(
   encrypted_json: &str,
   key: &[u8; KEY_SIZE],
 ) -> Result<T, String> {
-  let encrypted: EncryptedData =
-    serde_json::from_str(encrypted_json).map_err(|e| e.to_string())?;
+  let encrypted: EncryptedData = serde_json::from_str(encrypted_json).map_err(|e| e.to_string())?;
   let plaintext = decrypt(&encrypted, key)?;
   serde_json::from_str(&plaintext).map_err(|e| e.to_string())
 }
