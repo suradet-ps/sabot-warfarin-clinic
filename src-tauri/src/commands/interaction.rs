@@ -1,6 +1,7 @@
 use crate::db::mysql;
 use crate::models::interaction::{DrugInteraction, DrugInteractionInput};
 use anyhow::Result;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::collections::BTreeMap;
@@ -144,7 +145,13 @@ pub async fn get_patient_drug_interactions(
     .await
     .map_err(|e| e.to_string())?;
 
-  // Build query without date filter - HosXP uses Buddhist Era dates which are hard to compare
+  // Calculate date 1 year ago from today (CE format for MySQL)
+  let one_year_ago = Utc::now()
+    .checked_sub_signed(chrono::Duration::days(365))
+    .map(|d| d.format("%Y-%m-%d").to_string())
+    .unwrap_or_else(|| "2024-01-01".to_string());
+
+  // Build query with date filter - only last 1 year
   let icode_placeholders: Vec<String> =
     interaction_icodes.iter().map(|_| "?".to_string()).collect();
   let query = format!(
@@ -158,6 +165,7 @@ pub async fn get_patient_drug_interactions(
             LEFT JOIN drugitems d ON d.icode = o.icode
             WHERE o.hn = ?
               AND o.icode IN ({})
+              AND o.vstdate >= ?
             ORDER BY o.vstdate DESC
             "#,
     icode_placeholders.join(", ")
@@ -167,6 +175,7 @@ pub async fn get_patient_drug_interactions(
   for icode in &interaction_icodes {
     builder = builder.bind(icode);
   }
+  builder = builder.bind(&one_year_ago);
 
   let rows = builder.fetch_all(&pool).await.map_err(|e| e.to_string())?;
 
