@@ -144,6 +144,28 @@ function ttrClass(v: number | null): string {
   return 'ttr-bad'
 }
 
+const sideEffectOptionsHigh: Record<string, string> = {
+  bleeding_gums: 'เหงือกเลือดออก',
+  bruising: 'เลือดออกใต้ผิว',
+  blood_urine: 'เลือดออกในปัสสาวะ',
+  blood_stool: 'เลือดออกในอุจจาระ',
+}
+const sideEffectOptionsLow: Record<string, string> = {
+  nausea: 'คลื่นไส้',
+  hair_loss: 'ผมร่วง',
+  other: 'อื่นๆ',
+}
+
+const adrHighLabels = computed(() => {
+  const selected = props.visit.sideEffects ?? []
+  return selected.map((k: string) => sideEffectOptionsHigh[k]).filter(Boolean)
+})
+
+const adrLowLabels = computed(() => {
+  const selected = props.visit.sideEffects ?? []
+  return selected.map((k: string) => sideEffectOptionsLow[k]).filter(Boolean)
+})
+
 function daysFromNow(dateStr: string | null): string {
   if (!dateStr) return ''
   const targetDate = new Date(dateStr)
@@ -164,7 +186,7 @@ function daysFromNow(dateStr: string | null): string {
         <strong>Warfarin Assessment & Recommendation</strong>
         <span class="slip-subtitle">คลินิกวาร์ฟาริน {{ hospitalName }}</span>
       </div>
-      <div class="slip-date">{{ formatThaiDate(visit.visitDate) }}</div>
+      <div class="slip-date">{{ formatThaiDate(props.visit.visitDate) }}</div>
     </div>
 
     <table class="patient-table">
@@ -179,7 +201,7 @@ function daysFromNow(dateStr: string | null): string {
           <td><span class="label">ข้อบ่งชี้</span>{{ p.indication || '-' }}</td>
           <td><span class="label">เป้าหมาย INR</span>{{ p.targetInrLow.toFixed(1) }}–{{ p.targetInrHigh.toFixed(1) }}</td>
           <td><span class="label">TTR 6 เดือน</span><span :class="ttrClass(ttr)">{{ ttr != null ? ttr.toFixed(0) + '%' : '-' }}</span></td>
-          <td><span class="label">การรับประทานยา</span>{{ adherenceLabel[visit.adherence ?? ''] ?? '-' }}</td>
+          <td><span class="label">การรับประทานยา</span>{{ adherenceLabel[props.visit.adherence ?? ''] ?? '-' }}</td>
         </tr>
       </tbody>
     </table>
@@ -187,7 +209,7 @@ function daysFromNow(dateStr: string | null): string {
     <div class="inr-section">
       <div class="inr-today">
         <span class="label">ค่า INR วันนี้</span>
-        <span class="inr-value">{{ visit.inrValue?.toFixed(2) ?? '-' }}</span>
+        <span class="inr-value">{{ props.visit.inrValue?.toFixed(2) ?? '-' }}</span>
       </div>
       <div class="inr-chart">
         <svg v-if="inrRecords.length" :viewBox="`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`" preserveAspectRatio="xMidYMid meet">
@@ -289,9 +311,27 @@ function daysFromNow(dateStr: string | null): string {
     <div class="footer-section">
       <div class="appointment-info">
         <span class="label">นัดครั้งต่อไป:</span>
-        <strong>{{ formatThaiDate(visit.nextAppointment) }}</strong>
-        <span class="days-from-now">{{ daysFromNow(visit.nextAppointment) }}</span>
+        <strong>{{ formatThaiDate(props.visit.nextAppointment) }}</strong>
+        <span class="days-from-now">{{ daysFromNow(props.visit.nextAppointment ?? null) }}</span>
       </div>
+    </div>
+
+    <div class="adr-section">
+      <span class="label">อาการไม่พึงประสงค์:</span>
+      <div v-if="adrHighLabels.length || adrLowLabels.length">
+        <div v-if="adrHighLabels.length" class="adr-group">
+          <span class="adr-category">ระดับยาสูง:</span>
+          <span class="adr-items">{{ adrHighLabels.join(', ') }}</span>
+        </div>
+        <div v-if="adrLowLabels.length" class="adr-group">
+          <span class="adr-category">ระดับยาต่ำ:</span>
+          <span class="adr-items">{{ adrLowLabels.join(', ') }}</span>
+        </div>
+      </div>
+      <span v-else class="adr-none">-</span>
+    </div>
+
+    <div class="footer-section">
       <div class="signature-area">
         <div class="signature-box">
           <span class="label">Pharmacist Notes</span>
@@ -301,7 +341,7 @@ function daysFromNow(dateStr: string | null): string {
         <div class="signature-box">
           <span class="label">ลายมือชื่อแพทย์</span>
           <div class="sig-line" />
-          <span class="doctor-name">{{ visit.physician || '____________________' }}</span>
+          <div class="sig-line" />
         </div>
       </div>
     </div>
@@ -498,6 +538,44 @@ function daysFromNow(dateStr: string | null): string {
   display: block;
   font-size: var(--typography-body-sm-size);
   color: var(--color-slate);
+}
+
+.adr-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-md);
+  align-items: baseline;
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border-radius: var(--rounded-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.adr-section .label {
+  font-size: var(--typography-body-sm-size);
+  color: var(--color-slate);
+  font-weight: 500;
+}
+
+.adr-group {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.adr-category {
+  font-size: var(--typography-caption-size);
+  color: var(--color-slate);
+}
+
+.adr-items {
+  font-size: var(--typography-body-sm-size);
+  color: var(--color-brand-coral);
+  font-weight: 500;
+}
+
+.adr-none {
+  font-size: var(--typography-body-sm-size);
+  color: var(--color-stone);
 }
 
 .footer-section {

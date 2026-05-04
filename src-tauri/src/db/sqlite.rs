@@ -352,6 +352,7 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
   let side_effects_json = input
     .side_effects
     .as_ref()
+    .filter(|s| !s.is_empty())
     .map(|s| serde_json::to_string(s).unwrap_or_default());
   let selected_dose_option_json = input
     .selected_dose_option
@@ -418,6 +419,7 @@ pub async fn update_visit(pool: &SqlitePool, visit_id: i64, input: &VisitInput) 
   let side_effects_json = input
     .side_effects
     .as_ref()
+    .filter(|s| !s.is_empty())
     .map(|s| serde_json::to_string(s).unwrap_or_default());
   let selected_dose_option_json = input
     .selected_dose_option
@@ -504,7 +506,8 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         .try_get::<Option<String>, _>("side_effects")
         .ok()
         .flatten()
-        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok());
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .filter(|v| !v.is_empty());
       let selected_dose_option = r
         .try_get::<Option<String>, _>("selected_dose_option")
         .ok()
@@ -579,7 +582,8 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       .try_get::<Option<String>, _>("side_effects")
       .ok()
       .flatten()
-      .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok());
+      .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+      .filter(|v| !v.is_empty());
     let selected_dose_option = r
       .try_get::<Option<String>, _>("selected_dose_option")
       .ok()

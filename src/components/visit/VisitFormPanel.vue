@@ -70,11 +70,13 @@ const availablePills = ref<AvailablePills>({ ...DEFAULT_AVAILABLE_PILLS })
 const allowHalf = ref(true)
 const specialDayPattern = ref<'fri-sun' | 'mon-wed-fri'>('fri-sun')
 
-const sideEffectOptions = [
+const sideEffectOptionsHigh = [
   { key: 'bleeding_gums', label: 'เหงือกเลือดออก' },
   { key: 'bruising', label: 'เลือดออกใต้ผิว' },
   { key: 'blood_urine', label: 'เลือดออกในปัสสาวะ' },
   { key: 'blood_stool', label: 'เลือดออกในอุจจาระ' },
+]
+const sideEffectOptionsLow = [
   { key: 'nausea', label: 'คลื่นไส้' },
   { key: 'hair_loss', label: 'ผมร่วง' },
   { key: 'other', label: 'อื่นๆ' },
@@ -306,7 +308,7 @@ async function handleSubmit() {
       nextInrDue: nextInrDue.value || undefined,
       physician: physician.value || undefined,
       adherence: adherence.value,
-      sideEffects: selectedSideEffects.value,
+      sideEffects: selectedSideEffects.value.length > 0 ? selectedSideEffects.value : null,
       notes: notes.value || undefined,
     }
 
@@ -427,9 +429,19 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
           </div>
 
           <div class="form-section">
-            <p class="caption label">อาการไม่พึงประสงค์</p>
+            <p class="caption label">อาการไม่พึงประสงค์จากระดับยาสูง (INR &gt; 3.0)</p>
             <div class="checkbox-grid">
-              <label v-for="se in sideEffectOptions" :key="se.key" class="checkbox-label">
+              <label v-for="se in sideEffectOptionsHigh" :key="se.key" class="checkbox-label">
+                <input type="checkbox" :value="se.key" v-model="selectedSideEffects" />
+                {{ se.label }}
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <p class="caption label">อาการไม่พึงประสงค์จากระดับยาต่ำ (&lt; 2.0)</p>
+            <div class="checkbox-grid">
+              <label v-for="se in sideEffectOptionsLow" :key="se.key" class="checkbox-label">
                 <input type="checkbox" :value="se.key" v-model="selectedSideEffects" />
                 {{ se.label }}
               </label>

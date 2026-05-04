@@ -33,6 +33,7 @@ async function loadSlip() {
   ttr.value = null
   try {
     visit.value = await invoke<WfVisit>('get_visit_by_id', { visitId: visitId.value })
+    console.log('visit loaded:', JSON.stringify(visit.value))
     const [patientDetail, inrHistory, ttrValue] = await Promise.all([
       invoke<PatientDetail>('get_patient_detail', { hn: visit.value.hn }),
       invoke<InrRecord[]>('get_inr_history', { hn: visit.value.hn }),

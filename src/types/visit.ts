@@ -60,7 +60,7 @@ export interface VisitInput {
   nextInrDue?: string
   physician?: string
   notes?: string
-  sideEffects?: string[]
+  sideEffects?: string[] | null
   adherence?: string
   createdBy?: string
   selectedDoseOption?: RegimenOption
