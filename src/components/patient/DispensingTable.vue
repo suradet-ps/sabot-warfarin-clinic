@@ -26,7 +26,7 @@ function regimenSummary(items: DispensingRecord[]): string {
   <section class="card dispensing-section">
     <div>
       <h3 class="h5">&#x0E1B;&#x0E23;&#x0E30;&#x0E27;&#x0E31;&#x0E15;&#x0E34;&#x0E01;&#x0E32;&#x0E23;&#x0E08;&#x0E48;&#x0E32;&#x0E22;&#x0E22;&#x0E32;</h3>
-      <p class="body-sm section-meta">&#x0E02;&#x0E49;&#x0E2D;&#x0E21;&#x0E39;&#x0E25;&#x0E08;&#x0E32;&#x0E01; HosXP &#x0E1E;&#x0E23;&#x0E49;&#x0E2D;&#x0E21;&#x0E01;&#x0E32;&#x0E23;&#x0E15;&#x0E35;&#x0E04;&#x0E27;&#x0E32;&#x0E21;&#x0E27;&#x0E34;&#x0E18;&#x0E35;&#x0E43;&#x0E0A;&#x0E49;&#x0E22;&#x0E32;&#x0E40;&#x0E1B;&#x0E47;&#x0E19; mg/week</p>
+      <p class="body-sm section-meta">&#x0E02;&#x0E49;&#x0E2D;&#x0E21;&#x0E39;&#x0E25;&#x0E08;&#x0E32;&#x0E01; HOSxP &#x0E1E;&#x0E23;&#x0E49;&#x0E2D;&#x0E21;&#x0E01;&#x0E32;&#x0E23;&#x0E15;&#x0E35;&#x0E04;&#x0E27;&#x0E32;&#x0E21;&#x0E27;&#x0E34;&#x0E18;&#x0E35;&#x0E43;&#x0E0A;&#x0E49;&#x0E22;&#x0E32;&#x0E40;&#x0E1B;&#x0E47;&#x0E19; mg/week</p>
     </div>
     <table class="table">
       <thead>

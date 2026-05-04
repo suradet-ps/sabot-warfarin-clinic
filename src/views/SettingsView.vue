@@ -39,7 +39,7 @@ async function onSearchKeyword() {
   if (!searchKeyword.value.trim()) return
   
   if (!store.isConnected) {
-    alert('กรุณาเชื่อมต่อ HosXP MySQL ก่อนค้นหายา\n(ไปที่แท็บ "การเชื่อมต่อ" และกด "ทดสอบการเชื่อมต่อ")')
+    alert('กรุณาเชื่อมต่อ HOSxP MySQL ก่อนค้นหายา\n(ไปที่แท็บ "การเชื่อมต่อ" และกด "ทดสอบการเชื่อมต่อ")')
     return
   }
   
@@ -95,7 +95,7 @@ async function handleDeleteInteraction(id: number) {
     </div>
 
     <div v-if="activeSection === 'connection'" class="settings-section card">
-      <h3 class="h4" style="margin-bottom: var(--spacing-xl)">การเชื่อมต่อ HosXP MySQL</h3>
+      <h3 class="h4" style="margin-bottom: var(--spacing-xl)">การเชื่อมต่อ HOSxP MySQL</h3>
       <div class="form-grid">
         <label class="form-field">
           <span class="caption" style="color:var(--color-slate)">Host</span>
@@ -193,7 +193,7 @@ async function handleDeleteInteraction(id: number) {
 
           <div class="modal-body">
             <label class="form-field">
-              <span class="caption" style="color:var(--color-slate)">ค้นหายาใน HosXP</span>
+              <span class="caption" style="color:var(--color-slate)">ค้นหายาใน HOSxP</span>
               <div class="search-input-group">
                 <input
                   class="input"

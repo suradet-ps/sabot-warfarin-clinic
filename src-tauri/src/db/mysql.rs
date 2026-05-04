@@ -1,9 +1,9 @@
-//! HosXP MySQL read-only query layer.
+//! HOSxP MySQL read-only query layer.
 //!
-//! **This module NEVER writes to HosXP.** All functions return `anyhow::Result`
+//! **This module NEVER writes to HOSxP.** All functions return `anyhow::Result`
 //! so command handlers can surface connection and query failures explicitly.
 //!
-//! Runtime queries (`sqlx::query()`) are used throughout because the HosXP
+//! Runtime queries (`sqlx::query()`) are used throughout because the HOSxP
 //! MySQL server is only available at runtime, never at compile time.
 
 use anyhow::{Context, Result, bail};
@@ -56,7 +56,7 @@ pub async fn create_pool(config: &DbConfig) -> Result<sqlx::MySqlPool> {
     .acquire_timeout(std::time::Duration::from_secs(5))
     .connect(&config.connection_url())
     .await
-    .context("failed to connect to HosXP MySQL")
+    .context("failed to connect to HOSxP MySQL")
 }
 
 /// Tests whether the given MySQL config can establish a connection.
@@ -244,7 +244,7 @@ fn build_screening_query<'a>(
 
 // ── Patient demographics ──────────────────────────────────────────────────────
 
-/// Fetches basic demographics for a single patient from HosXP.
+/// Fetches basic demographics for a single patient from HOSxP.
 pub async fn get_hosxp_patient(config: &DbConfig, hn: &str) -> Result<Option<HosxpPatient>> {
   let pool = create_pool(config).await?;
   let row = sqlx::query(
@@ -253,7 +253,7 @@ pub async fn get_hosxp_patient(config: &DbConfig, hn: &str) -> Result<Option<Hos
   .bind(hn)
   .fetch_optional(&pool)
   .await
-  .context("failed to query HosXP patient")?;
+  .context("failed to query HOSxP patient")?;
 
   Ok(row.map(|r| HosxpPatient {
     hn: r.get("hn"),
@@ -290,7 +290,7 @@ async fn get_hosxp_patients_by_hns_with_pool(
     .build()
     .fetch_all(pool)
     .await
-    .context("failed to batch query HosXP patients")?;
+    .context("failed to batch query HOSxP patients")?;
 
   Ok(
     rows
@@ -470,10 +470,10 @@ pub async fn search_hosxp_warfarin_patients(
   .build()
   .fetch_one(&pool)
   .await
-  .context("failed to count HosXP warfarin patients")?;
+  .context("failed to count HOSxP warfarin patients")?;
   let total = total_row
     .try_get::<i64, _>(0)
-    .context("failed to read HosXP screening count")? as usize;
+    .context("failed to read HOSxP screening count")? as usize;
 
   let mut items_query = build_screening_query(
     r#"
@@ -506,7 +506,7 @@ pub async fn search_hosxp_warfarin_patients(
     .build()
     .fetch_all(&pool)
     .await
-    .context("failed to search HosXP warfarin patients")?;
+    .context("failed to search HOSxP warfarin patients")?;
 
   let mut records: Vec<PatientDrugRecord> = rows
     .iter()

@@ -93,7 +93,7 @@ pub async fn get_active_patient_summaries(
           hn: patient.hn.clone(),
           pname: String::new(),
           fname: format!("HN {}", patient.hn),
-          lname: "(ไม่พบข้อมูล HosXP)".to_string(),
+          lname: "(ไม่พบข้อมูล HOSxP)".to_string(),
           birthday: String::new(),
           sex: "U".to_string(),
           addrpart: None,
@@ -130,7 +130,7 @@ pub async fn get_patient_detail(
     .map_err(|e| e.to_string())?
     .ok_or_else(|| format!("patient not found: {hn}"))?;
 
-  // Fetch HosXP demographics — graceful fallback if MySQL is unavailable.
+  // Fetch HOSxP demographics — graceful fallback if MySQL is unavailable.
   let hosxp_info = try_get_hosxp_patient(&state, &hn).await;
 
   // Combine INR from clinic visits (SQLite) as fallback / supplement.
@@ -201,7 +201,7 @@ pub async fn update_patient_status(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Attempts to fetch patient demographics from HosXP MySQL, returning a
+/// Attempts to fetch patient demographics from HOSxP MySQL, returning a
 /// placeholder on any failure so the UI is never blocked.
 async fn try_get_hosxp_patient(state: &AppState, hn: &str) -> HosxpPatient {
   let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
@@ -219,7 +219,7 @@ async fn try_get_hosxp_patient(state: &AppState, hn: &str) -> HosxpPatient {
     hn: hn.to_string(),
     pname: "".to_string(),
     fname: format!("HN {hn}"),
-    lname: "(ไม่พบข้อมูล HosXP)".to_string(),
+    lname: "(ไม่พบข้อมูล HOSxP)".to_string(),
     birthday: "".to_string(),
     sex: "U".to_string(),
     addrpart: None,
@@ -245,7 +245,7 @@ async fn try_get_dispensing_history(
   Vec::new()
 }
 
-/// Returns INR records, preferring HosXP MySQL (dual-source merge) and
+/// Returns INR records, preferring HOSxP MySQL (dual-source merge) and
 /// falling back to clinic-recorded INR values from `wf_visits`.
 pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord> {
   let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
