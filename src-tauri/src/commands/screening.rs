@@ -7,7 +7,7 @@ use tauri::State;
 
 use crate::{
   db::{
-    mysql::{DbConfig, search_hosxp_warfarin_patients},
+    mysql::{search_hosxp_warfarin_patients},
     sqlite::{AppState, get_all_enrolled_hns},
   },
   models::patient::{SearchFilters, SearchResponse},
@@ -23,13 +23,10 @@ pub async fn search_warfarin_patients(
     .await
     .map_err(|e| e.to_string())?;
 
-  let mysql_config = crate::db::sqlite::get_setting(&state.pool, "mysql_config")
+  let config = crate::commands::settings::get_mysql_config_internal(&state.pool)
     .await
     .map_err(|e| e.to_string())?
     .ok_or_else(|| "ยังไม่ได้ตั้งค่าการเชื่อมต่อ HosXP".to_string())?;
-
-  let config = serde_json::from_str::<DbConfig>(&mysql_config)
-    .map_err(|e| format!("อ่านค่าการเชื่อมต่อ HosXP ไม่สำเร็จ: {e}"))?;
 
   search_hosxp_warfarin_patients(&config, &filters, &enrolled_hns)
     .await

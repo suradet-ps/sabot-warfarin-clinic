@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod db;
 pub mod dose;
+pub mod encrypt;
 pub mod models;
 
 use anyhow::{Context, Result};
@@ -19,7 +20,7 @@ use commands::{
   },
   reports::{calculate_clinic_ttr, calculate_ttr, get_report_data},
   screening::search_warfarin_patients,
-  settings::{get_setting_value, get_settings, save_setting, test_mysql_connection},
+  settings::{get_mysql_config_for_ui, get_setting_value, get_settings, save_setting, test_mysql_connection},
   visits::{
     delete_visit, get_visit_by_id, get_visit_history, save_visit, suggest_dose, update_visit,
   },
@@ -55,6 +56,7 @@ fn initialise_app_state(app: &mut App) -> Result<()> {
 pub fn run() -> tauri::Result<()> {
   tauri::Builder::default()
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_store::Builder::new().build())
     .setup(|app| initialise_app_state(app).map_err(Into::into))
     .invoke_handler(tauri::generate_handler![
       search_warfarin_patients,
@@ -77,6 +79,7 @@ pub fn run() -> tauri::Result<()> {
       save_setting,
       get_setting_value,
       test_mysql_connection,
+      get_mysql_config_for_ui,
       get_inr_history,
       get_latest_inr,
       schedule_appointment,

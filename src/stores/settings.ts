@@ -19,24 +19,49 @@ export interface HosxpDrugItem {
   units: string
 }
 
+export interface MysqlConfig {
+  host: string
+  port: number
+  database: string
+  username: string
+  password: string
+}
+
 export const useSettingsStore = defineStore('settings', () => {
-  const mysqlConfig = ref({
+  const mysqlConfig = ref<MysqlConfig>({
     host: 'localhost',
     port: 3306,
     database: 'hosxp',
     username: '',
     password: '',
   })
+  const hasStoredConfig = ref(false)
   const hospitalName = ref('โรงพยาบาลสระโบสถ์')
   const staffList = ref<string[]>([])
   const isConnected = ref(false)
   const drugInteractions = ref<DrugInteraction[]>([])
+
+  async function loadMysqlConfig() {
+    try {
+      const config = await invoke<MysqlConfig | null>('get_mysql_config_for_ui')
+      if (config) {
+        mysqlConfig.value = config
+        hasStoredConfig.value = true
+        isConnected.value = true
+      }
+    } catch (e) {
+      console.error('Failed to load MySQL config:', e)
+    }
+  }
 
   async function testConnection() {
     try {
       isConnected.value = await invoke<boolean>('test_mysql_connection', {
         config: mysqlConfig.value,
       })
+      if (isConnected.value) {
+        hasStoredConfig.value = true
+      }
       return isConnected.value
     } catch (e) {
       console.error('Connection test failed:', e)
@@ -88,10 +113,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     mysqlConfig,
+    hasStoredConfig,
     hospitalName,
     staffList,
     isConnected,
     drugInteractions,
+    loadMysqlConfig,
     testConnection,
     loadSettings,
     loadDrugInteractions,

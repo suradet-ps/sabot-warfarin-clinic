@@ -5,10 +5,10 @@ use tauri::State;
 
 use crate::{
   db::{
-    mysql::{DbConfig, get_dispensing_history, get_hosxp_patient},
+    mysql::{get_dispensing_history, get_hosxp_patient},
     sqlite::{
       AppState, enroll_patient as db_enroll, get_active_patients as db_get_active,
-      get_inr_from_visits, get_patient_by_hn, get_pending_appointments, get_setting,
+      get_inr_from_visits, get_patient_by_hn, get_pending_appointments,
       get_visit_history, update_patient_status as db_update_status,
     },
   },
@@ -33,11 +33,9 @@ pub async fn get_active_patient_summaries(
     .await
     .map_err(|e| e.to_string())?;
   let hns: Vec<String> = patients.iter().map(|patient| patient.hn.clone()).collect();
-  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+  let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
     .await
-    .ok()
-    .flatten()
-    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+    .map_err(|e| e.to_string())?;
 
   let (hosxp_map, mysql_inr_map) = if let Some(config) = config_result {
     crate::db::mysql::get_dashboard_patient_data(&config, &hns)
@@ -206,11 +204,10 @@ pub async fn update_patient_status(
 /// Attempts to fetch patient demographics from HosXP MySQL, returning a
 /// placeholder on any failure so the UI is never blocked.
 async fn try_get_hosxp_patient(state: &AppState, hn: &str) -> HosxpPatient {
-  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+  let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
     .await
     .ok()
-    .flatten()
-    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+    .flatten();
 
   if let Some(config) = config_result
     && let Ok(Some(info)) = get_hosxp_patient(&config, hn).await
@@ -234,11 +231,10 @@ async fn try_get_dispensing_history(
   state: &AppState,
   hn: &str,
 ) -> Vec<crate::models::dispensing::DispensingRecord> {
-  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+  let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
     .await
     .ok()
-    .flatten()
-    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+    .flatten();
 
   if let Some(config) = config_result
     && let Ok(records) = get_dispensing_history(&config, hn).await
@@ -252,11 +248,10 @@ async fn try_get_dispensing_history(
 /// Returns INR records, preferring HosXP MySQL (dual-source merge) and
 /// falling back to clinic-recorded INR values from `wf_visits`.
 pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord> {
-  let config_result: Option<DbConfig> = get_setting(&state.pool, "mysql_config")
+  let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
     .await
     .ok()
-    .flatten()
-    .and_then(|s: String| serde_json::from_str::<DbConfig>(&s).ok());
+    .flatten();
 
   if let Some(config) = config_result
     && let Ok(records) = crate::db::mysql::get_inr_history(&config, hn).await

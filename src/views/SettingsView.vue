@@ -16,6 +16,7 @@ const sections = [
 ] as const
 
 onMounted(() => {
+  void store.loadMysqlConfig()
   void store.loadSettings()
   void store.loadDrugInteractions()
 })
