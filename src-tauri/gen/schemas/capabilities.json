@@ -1,1 +1,1 @@
-{}
+{"main-user-interface":{"identifier":"main-user-interface","description":"Allows the main application window to use core APIs, bundled plugins, and slip printing/export actions.","local":true,"windows":["main"],"permissions":["core:default","core:webview:allow-print","shell:default","store:default","dialog:default"]}}

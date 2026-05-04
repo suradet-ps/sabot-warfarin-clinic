@@ -23,6 +23,7 @@ use commands::{
   settings::{
     get_mysql_config_for_ui, get_setting_value, get_settings, save_setting, test_mysql_connection,
   },
+  slip::save_slip_pdf,
   visits::{
     delete_visit, get_visit_by_id, get_visit_history, save_visit, suggest_dose, update_visit,
   },
@@ -57,6 +58,7 @@ fn initialise_app_state(app: &mut App) -> Result<()> {
 
 pub fn run() -> tauri::Result<()> {
   tauri::Builder::default()
+    .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_store::Builder::new().build())
     .setup(|app| initialise_app_state(app).map_err(Into::into))
@@ -93,6 +95,7 @@ pub fn run() -> tauri::Result<()> {
       delete_drug_interaction,
       search_hosxp_drugs,
       get_patient_drug_interactions,
+      save_slip_pdf,
     ])
     .run(tauri::generate_context!())
 }

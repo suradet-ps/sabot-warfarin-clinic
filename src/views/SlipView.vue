@@ -1,55 +1,161 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
+import { jsPDF } from 'jspdf'
+import { toPng } from 'html-to-image'
+import { Download, Printer } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
-import { Printer } from 'lucide-vue-next'
 import PhysicianSlip from '#/components/slip/PhysicianSlip.vue'
 import type { InrRecord } from '#/types/inr'
 import type { PatientDetail } from '#/types/patient'
 import type { WfVisit } from '#/types/visit'
+import { getCssVar } from '#/utils/clinic'
 
 const route = useRoute()
+
 const visitId = computed(() => Number(route.params.visitId))
 const visit = ref<WfVisit | null>(null)
 const patient = ref<PatientDetail | null>(null)
 const ttr = ref<number | null>(null)
 const loading = ref(false)
-const error = ref<string | null>(null)
+const printing = ref(false)
+const exportingPdf = ref(false)
+const loadError = ref<string | null>(null)
+const actionError = ref<string | null>(null)
+const slipCapture = ref<HTMLElement | null>(null)
+
+const canOutput = computed(() => Boolean(visit.value && patient.value && slipCapture.value) && !loading.value)
+const defaultPdfFileName = computed(() => {
+  if (!visit.value) return 'warfarin-slip.pdf'
+  return `warfarin-slip-${visit.value.hn}-${visit.value.visitDate}.pdf`
+})
+
+function normalizeError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+function ensurePdfExtension(path: string): string {
+  return path.toLowerCase().endsWith('.pdf') ? path : `${path}.pdf`
+}
+
+async function waitForStableSlip(): Promise<void> {
+  await nextTick()
+  await document.fonts.ready
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+}
 
 async function loadSlip() {
   if (!Number.isInteger(visitId.value) || visitId.value <= 0) {
     visit.value = null
     patient.value = null
     ttr.value = null
-    error.value = 'visit id ไม่ถูกต้อง'
+    loadError.value = 'visit id ไม่ถูกต้อง'
     loading.value = false
     return
   }
 
   loading.value = true
-  error.value = null
+  loadError.value = null
+  actionError.value = null
   visit.value = null
   patient.value = null
   ttr.value = null
+
   try {
-    visit.value = await invoke<WfVisit>('get_visit_by_id', { visitId: visitId.value })
-    console.log('visit loaded:', JSON.stringify(visit.value))
+    const currentVisit = await invoke<WfVisit>('get_visit_by_id', { visitId: visitId.value })
     const [patientDetail, inrHistory, ttrValue] = await Promise.all([
-      invoke<PatientDetail>('get_patient_detail', { hn: visit.value.hn }),
-      invoke<InrRecord[]>('get_inr_history', { hn: visit.value.hn }),
-      invoke<number | null>('calculate_ttr', { hn: visit.value.hn, windowDays: 182 }),
+      invoke<PatientDetail>('get_patient_detail', { hn: currentVisit.hn }),
+      invoke<InrRecord[]>('get_inr_history', { hn: currentVisit.hn }),
+      invoke<number | null>('calculate_ttr', { hn: currentVisit.hn, windowDays: 182 }),
     ])
+
+    visit.value = currentVisit
     patient.value = { ...patientDetail, inrHistory }
     ttr.value = ttrValue
-  } catch (invokeError) {
-    error.value = String(invokeError)
+  } catch (error) {
+    loadError.value = normalizeError(error)
   } finally {
     loading.value = false
   }
 }
 
-function printSlip() {
-  window.print()
+async function printSlip() {
+  if (!canOutput.value) return
+
+  printing.value = true
+  actionError.value = null
+
+  try {
+    await waitForStableSlip()
+    await Promise.resolve(window.print())
+  } catch (error) {
+    actionError.value = normalizeError(error)
+  } finally {
+    printing.value = false
+  }
+}
+
+async function exportPdf() {
+  if (!canOutput.value || !slipCapture.value || !visit.value) return
+
+  exportingPdf.value = true
+  actionError.value = null
+
+  try {
+    await waitForStableSlip()
+
+    const filePath = await save({
+      defaultPath: defaultPdfFileName.value,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    })
+
+    if (!filePath) return
+
+      const backgroundColor = getCssVar('--color-canvas') || 'white'
+    const rect = slipCapture.value.getBoundingClientRect()
+    const imageData = await toPng(slipCapture.value, {
+      backgroundColor,
+      cacheBust: true,
+      pixelRatio: Math.max(window.devicePixelRatio, 2),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    })
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
+    })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const imageAspectRatio = rect.height / rect.width
+    let renderWidth = pageWidth
+    let renderHeight = renderWidth * imageAspectRatio
+
+    if (renderHeight > pageHeight) {
+      renderHeight = pageHeight
+      renderWidth = renderHeight / imageAspectRatio
+    }
+
+    const offsetX = (pageWidth - renderWidth) / 2
+    const offsetY = (pageHeight - renderHeight) / 2
+    pdf.addImage(imageData, 'PNG', offsetX, offsetY, renderWidth, renderHeight, undefined, 'FAST')
+
+    const bytes = new Uint8Array(pdf.output('arraybuffer'))
+    await invoke('save_slip_pdf', {
+      path: ensurePdfExtension(filePath),
+      bytes: Array.from(bytes),
+    })
+  } catch (error) {
+    actionError.value = normalizeError(error)
+  } finally {
+    exportingPdf.value = false
+  }
 }
 
 watch(visitId, () => {
@@ -60,36 +166,120 @@ watch(visitId, () => {
 <template>
   <div class="slip-view">
     <div class="slip-toolbar">
-      <button type="button" class="btn btn-primary print-button" @click="printSlip"><Printer :size="16" /></button>
+      <button type="button" class="btn btn-secondary" :disabled="!canOutput || exportingPdf" @click="exportPdf">
+        <Download :size="16" />
+        {{ exportingPdf ? 'กำลังสร้าง PDF...' : 'ส่งออก PDF' }}
+      </button>
+      <button type="button" class="btn btn-primary print-button" :disabled="!canOutput || printing" @click="printSlip">
+        <Printer :size="16" />
+        {{ printing ? 'กำลังเปิดหน้าพิมพ์...' : 'พิมพ์' }}
+      </button>
     </div>
-    <div v-if="loading" class="card loading-card body-sm" style="padding: var(--spacing-xxl)">กำลังโหลด...</div>
-    <div v-else-if="error" class="card card-feature-coral">{{ error }}</div>
-    <PhysicianSlip v-else-if="visit && patient" :visit="(visit as WfVisit)" :patient="(patient as PatientDetail)" :ttr="ttr" />
+
+    <div v-if="loading" class="card loading-card body-sm">กำลังโหลด...</div>
+    <div v-else-if="loadError" class="card card-feature-coral">{{ loadError }}</div>
+    <template v-else-if="visit && patient">
+      <div v-if="actionError" class="card card-feature-coral action-error">{{ actionError }}</div>
+      <div class="slip-preview-frame">
+        <div class="slip-preview-surface">
+          <div ref="slipCapture" class="slip-capture">
+            <PhysicianSlip :visit="visit" :patient="patient" :ttr="ttr" />
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
+<style>
+@page {
+  size: A4 portrait;
+  margin: 6mm;
+}
+
+@media print {
+  html,
+  body,
+  #app {
+    background: var(--color-canvas) !important;
+  }
+
+  .sidebar,
+  .app-header,
+  .slip-toolbar,
+  .action-error {
+    display: none !important;
+  }
+
+  .app-shell,
+  .app-main,
+  .app-content,
+  .slip-view,
+  .slip-preview-frame,
+  .slip-preview-surface,
+  .slip-capture {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: var(--color-canvas) !important;
+  }
+}
+</style>
+
 <style scoped>
 .slip-view {
-  max-width: 56rem;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  align-items: center;
 }
 
 .slip-toolbar {
+  width: 100%;
+  max-width: calc(210mm + var(--spacing-md) * 2);
   display: flex;
   justify-content: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.slip-preview-frame {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: var(--spacing-sm);
+}
+
+.slip-preview-surface {
+  border-radius: var(--rounded-xl);
+  box-shadow: var(--elevation-2);
+}
+
+.slip-capture {
+  width: 210mm;
+  max-width: 210mm;
 }
 
 .loading-card {
+  width: 100%;
+  max-width: 210mm;
+  padding: var(--spacing-xxl);
   text-align: center;
   color: var(--color-slate);
 }
 
+.action-error {
+  width: 100%;
+  max-width: 210mm;
+}
+
 @media print {
-  .slip-toolbar {
-    display: none;
+  .slip-preview-surface {
+    box-shadow: none;
+    border-radius: 0;
   }
 }
 </style>

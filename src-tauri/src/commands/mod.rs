@@ -7,4 +7,5 @@ pub mod patients;
 pub mod reports;
 pub mod screening;
 pub mod settings;
+pub mod slip;
 pub mod visits;

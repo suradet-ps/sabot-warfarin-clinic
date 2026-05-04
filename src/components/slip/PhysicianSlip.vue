@@ -4,7 +4,15 @@ import { useSettingsStore } from '#/stores/settings'
 import RegimenOptionCard from '#/components/visit/RegimenOptionCard.vue'
 import type { PatientDetail } from '#/types/patient'
 import type { WfVisit } from '#/types/visit'
-import { calculateAge, doseDayKeys, doseDayLabels, formatThaiDate, normalizeDoseSchedule, scheduleWeeklyTotal, scheduleAverageDose } from '#/utils/clinic'
+import {
+  calculateAge,
+  doseDayKeys,
+  doseDayLabels,
+  formatThaiDate,
+  getCssVar,
+  normalizeDoseSchedule,
+  scheduleWeeklyTotal,
+} from '#/utils/clinic'
 import { createRegimenOptionSnapshot } from '#/utils/regimen'
 
 const props = defineProps<{ visit: WfVisit; patient: PatientDetail; ttr: number | null }>()
@@ -12,7 +20,7 @@ const props = defineProps<{ visit: WfVisit; patient: PatientDetail; ttr: number 
 const settingsStore = useSettingsStore()
 const hospitalName = ref('โรงพยาบาลสระโบสถ์')
 
-settingsStore.loadSettings().then(() => {
+void settingsStore.loadSettings().then(() => {
   hospitalName.value = settingsStore.hospitalName || hospitalName.value
 })
 
@@ -120,6 +128,14 @@ const xTicks = computed(() => {
   }))
 })
 
+const chartPalette = computed(() => ({
+  line: getCssVar('--color-primary') || '#111111',
+  canvas: getCssVar('--color-canvas') || '#ffffff',
+  grid: getCssVar('--color-hairline-soft') || '#e5e5e6',
+  target: getCssVar('--color-success-accent') || '#16a34a',
+  text: getCssVar('--color-slate') || '#6b7280',
+}))
+
 const info = computed(() => props.patient.hosxpInfo)
 const p = computed(() => props.patient.patient)
 const age = computed(() => (info.value ? calculateAge(info.value.birthday) : null))
@@ -219,9 +235,10 @@ function daysFromNow(dateStr: string | null): string {
             :y="targetBand.y"
             :width="CHART_WIDTH - PADDING.left - PADDING.right"
             :height="targetBand.height"
-            class="target-band"
+            :fill="chartPalette.target"
+            fill-opacity="0.15"
           />
-          <g class="grid">
+          <g>
             <line
               v-for="tick in yTicks"
               :key="`y-${tick}`"
@@ -229,47 +246,72 @@ function daysFromNow(dateStr: string | null): string {
               :y1="yForValue(tick)"
               :x2="CHART_WIDTH - PADDING.right"
               :y2="yForValue(tick)"
+              :stroke="chartPalette.grid"
+              stroke-width="1"
             />
           </g>
-          <g class="targets">
+          <g>
             <line
               :x1="PADDING.left"
               :y1="yForValue(patient.patient.targetInrHigh)"
               :x2="CHART_WIDTH - PADDING.right"
               :y2="yForValue(patient.patient.targetInrHigh)"
-              class="target-line"
+              :stroke="chartPalette.target"
+              stroke-width="1"
+              stroke-dasharray="4 4"
             />
             <line
               :x1="PADDING.left"
               :y1="yForValue(patient.patient.targetInrLow)"
               :x2="CHART_WIDTH - PADDING.right"
               :y2="yForValue(patient.patient.targetInrLow)"
-              class="target-line"
+              :stroke="chartPalette.target"
+              stroke-width="1"
+              stroke-dasharray="4 4"
             />
           </g>
-          <path :d="linePath" class="trend-line" />
-          <g class="points">
+          <path
+            :d="linePath"
+            fill="none"
+            :stroke="chartPalette.line"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <g>
             <circle
               v-for="point in points"
               :key="`${point.date}-${point.value}`"
               :cx="point.x"
               :cy="point.y"
               r="3"
+              :fill="chartPalette.line"
+              :stroke="chartPalette.canvas"
+              stroke-width="1.5"
             />
           </g>
-          <g class="x-axis">
+          <g>
             <template v-for="tick in xTicks" :key="`x-${tick.x}`">
-              <line :x1="tick.x" :y1="PADDING.top" :x2="tick.x" :y2="CHART_HEIGHT - PADDING.bottom" class="axis-grid" />
-              <text :x="tick.x" :y="CHART_HEIGHT - 4" text-anchor="middle">{{ tick.label }}</text>
+              <line
+                :x1="tick.x"
+                :y1="PADDING.top"
+                :x2="tick.x"
+                :y2="CHART_HEIGHT - PADDING.bottom"
+                :stroke="chartPalette.grid"
+                stroke-width="1"
+              />
+              <text :x="tick.x" :y="CHART_HEIGHT - 4" text-anchor="middle" :fill="chartPalette.text" font-size="10">{{ tick.label }}</text>
             </template>
           </g>
-          <g class="y-axis">
+          <g>
             <text
               v-for="tick in yTicks"
               :key="`label-${tick}`"
               :x="CHART_WIDTH - 4"
               :y="yForValue(tick) + 3"
               text-anchor="end"
+              :fill="chartPalette.text"
+              font-size="10"
             >
               {{ tick.toFixed(1) }}
             </text>
@@ -350,22 +392,28 @@ function daysFromNow(dateStr: string | null): string {
 
 <style scoped>
 .slip-sheet {
-  width: 100%;
-  max-width: 800px;
+  width: 210mm;
+  min-height: 297mm;
+  max-width: 210mm;
   margin: 0 auto;
-  padding: var(--spacing-xl);
+  padding: 8mm;
   background: var(--color-canvas);
   font-family: var(--font-family-primary);
   color: var(--color-ink);
   box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-xl);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 .slip-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
   border-bottom: 2px solid var(--color-primary);
 }
 
@@ -392,12 +440,13 @@ function daysFromNow(dateStr: string | null): string {
 .patient-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .patient-table td {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--color-hairline);
+  font-size: var(--typography-body-sm-size);
 }
 
 .patient-table .label {
@@ -409,10 +458,10 @@ function daysFromNow(dateStr: string | null): string {
 
 .inr-section {
   display: flex;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
   align-items: center;
-  margin-bottom: var(--spacing-lg);
-  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm);
   background: var(--color-surface);
   border-radius: var(--rounded-lg);
 }
@@ -421,7 +470,7 @@ function daysFromNow(dateStr: string | null): string {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 120px;
+  min-width: 110px;
 }
 
 .inr-today .label {
@@ -430,7 +479,7 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .inr-value {
-  font-size: 3rem;
+  font-size: 2.8rem;
   font-weight: 700;
   color: var(--color-primary);
   line-height: 1;
@@ -438,7 +487,7 @@ function daysFromNow(dateStr: string | null): string {
 
 .inr-chart {
   flex: 1;
-  height: 180px;
+  height: 148px;
 }
 
 .inr-chart svg {
@@ -454,67 +503,27 @@ function daysFromNow(dateStr: string | null): string {
   font-size: var(--typography-body-sm-size);
 }
 
-.inr-chart .target-band {
-  fill: color-mix(in srgb, var(--color-success-accent) 15%, transparent);
-}
-
-.inr-chart .grid line {
-  stroke: var(--color-hairline-soft);
-  stroke-width: 1;
-}
-
-.inr-chart .axis-grid {
-  stroke: var(--color-hairline-soft);
-  stroke-width: 1;
-}
-
-.inr-chart .target-line {
-  stroke: var(--color-success-accent);
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
-}
-
-.inr-chart .trend-line {
-  fill: none;
-  stroke: var(--color-primary);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.inr-chart .points circle {
-  fill: var(--color-primary);
-  stroke: var(--color-canvas);
-  stroke-width: 1.5;
-}
-
-.inr-chart .x-axis text,
-.inr-chart .y-axis text {
-  fill: var(--color-slate);
-  font-size: 10px;
-}
-
 .dose-section {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .dose-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
 }
 
 .dose-table th,
 .dose-table td {
-  padding: var(--spacing-sm);
+  padding: 6px;
   text-align: center;
   border: 1px solid var(--color-hairline);
+  font-size: var(--typography-body-sm-size);
 }
 
 .dose-table th {
   background: var(--color-surface);
   font-weight: 600;
-  font-size: var(--typography-body-sm-size);
 }
 
 .dose-label {
@@ -531,7 +540,7 @@ function daysFromNow(dateStr: string | null): string {
 .dose-instructions {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
 }
 
 .dose-instructions .label {
@@ -540,15 +549,43 @@ function daysFromNow(dateStr: string | null): string {
   color: var(--color-slate);
 }
 
+.dose-instructions :deep(.option-card) {
+  padding: var(--spacing-md);
+  box-shadow: none;
+}
+
+.dose-instructions :deep(.option-header) {
+  margin-bottom: var(--spacing-sm);
+  gap: var(--spacing-sm);
+}
+
+.dose-instructions :deep(.schedule-grid) {
+  gap: 4px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.dose-instructions :deep(.day-content) {
+  min-height: 56px;
+  padding: 6px;
+}
+
+.dose-instructions :deep(.pills-summary) {
+  padding: var(--spacing-sm);
+}
+
+.dose-instructions :deep(.summary-line) {
+  font-size: var(--typography-caption-size);
+}
+
 .adr-section {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm) var(--spacing-md);
   align-items: baseline;
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm);
   background: var(--color-surface);
   border-radius: var(--rounded-md);
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .adr-section .label {
@@ -581,16 +618,16 @@ function daysFromNow(dateStr: string | null): string {
 .footer-section {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding-top: var(--spacing-md);
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-hairline);
 }
 
 .appointment-info {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
   background: var(--color-surface);
   border-radius: var(--rounded-md);
 }
@@ -612,7 +649,7 @@ function daysFromNow(dateStr: string | null): string {
 .signature-area {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-xl);
+  gap: var(--spacing-lg);
 }
 
 .signature-box {
@@ -643,20 +680,94 @@ function daysFromNow(dateStr: string | null): string {
 
 @media print {
   .slip-sheet {
-    width: 100%;
+    width: auto;
     max-width: none;
-    padding: 10mm;
+    min-height: auto;
+    padding: 5mm;
     background: white;
     box-shadow: none;
+    border: none;
+    border-radius: 0;
+    page-break-inside: avoid;
+    break-inside: avoid-page;
   }
+
   .inr-section {
     background: white;
-    border: 1px solid #e5e5e6;
+    border: 1px solid var(--color-hairline);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-xs);
   }
+
+  .inr-chart {
+    height: 128px;
+  }
+
+  .patient-table,
+  .dose-section,
+  .adr-section {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .patient-table td {
+    padding: 4px 6px;
+  }
+
+  .dose-table th,
+  .dose-table td {
+    padding: 4px;
+  }
+
   .new-dose-row td {
     background: #e6faf9 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  }
+
+  .dose-instructions :deep(.option-card) {
+    break-inside: avoid;
+    padding: var(--spacing-sm);
+  }
+
+  .dose-instructions :deep(.option-header) {
+    margin-bottom: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
+
+  .dose-instructions :deep(.option-description),
+  .dose-instructions :deep(.summary-line) {
+    font-size: var(--typography-caption-size);
+  }
+
+  .dose-instructions :deep(.schedule-grid) {
+    gap: 2px;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .dose-instructions :deep(.day-content) {
+    min-height: 46px;
+    padding: 4px;
+  }
+
+  .dose-instructions :deep(.pills-summary) {
+    padding: var(--spacing-xs);
+  }
+
+  .adr-section,
+  .appointment-info {
+    padding: var(--spacing-xs);
+  }
+
+  .footer-section {
+    gap: var(--spacing-xs);
+    padding-top: var(--spacing-xs);
+  }
+
+  .signature-area {
+    gap: var(--spacing-md);
+  }
+
+  .sig-line {
+    margin: var(--spacing-sm) 0 2px;
   }
 }
 </style>
