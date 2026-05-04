@@ -92,7 +92,7 @@ onMounted(() => { void loadInteractions() })
         <table class="comparison-table">
           <thead>
             <tr class="comparison-row">
-              <th>วันที่</th>
+              <th>วันที่ล่าสุด</th>
               <th>ชื่อยา</th>
               <th>ผลต่อ Warfarin</th>
             </tr>
