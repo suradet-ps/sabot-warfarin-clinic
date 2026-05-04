@@ -59,8 +59,8 @@ async function loadInteractions() {
 const trendLabel = computed(() => {
   if (!summary.value) return ''
   switch (summary.value.trend) {
-    case 'increase': return 'มีแนวโน้มเพิ่มฤทธิ์ยา'
-    case 'decrease': return 'มีแนวโน้มลดฤทธิ์ยา'
+    case 'increase': return 'มีแนวโน้มเพิ่มฤทธิ์ยา Warfarin'
+    case 'decrease': return 'มีแนวโน้มลดฤทธิ์ยา Warfarin'
     case 'none': return 'ไม่มีปฏิกิริยากับยา Warfarin'
     default: return 'ไม่มีผลต่อยา Warfarin ชัดเจน'
   }
@@ -126,12 +126,12 @@ onMounted(() => { void loadInteractions() })
           <div class="stat-item">
             <ArrowUp :size="16" class="stat-icon increase" />
             <span class="stat-value">{{ summary?.increaseCount || 0 }}</span>
-            <span class="stat-label">ครั้ง ที่เพิ่มฤทธิ์</span>
+            <span class="stat-label">ยาที่เพิ่มฤทธิ์</span>
           </div>
           <div class="stat-item">
             <ArrowDown :size="16" class="stat-icon decrease" />
             <span class="stat-value">{{ summary?.decreaseCount || 0 }}</span>
-            <span class="stat-label">ครั้ง ที่ลดฤทธิ์</span>
+            <span class="stat-label">ยาที่ลดฤทธิ์</span>
           </div>
           <div class="stat-item stat-trend">
             <span class="h4">{{ trendLabel }}</span>
