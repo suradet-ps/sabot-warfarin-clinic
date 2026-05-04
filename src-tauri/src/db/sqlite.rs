@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use crate::models::{
   appointment::{AppointmentInput, WfAppointment},
   inr::InrRecord,
+  interaction::{DrugInteraction, DrugInteractionInput},
   outcome::{OutcomeInput, WfOutcome},
   patient::{EnrollmentInput, WfPatient},
   visit::{DoseSchedule, RegimenOptionSnapshot, TotalPillsSummary, VisitInput, WfVisit},
@@ -940,6 +941,80 @@ pub async fn get_setting(pool: &SqlitePool, key: &str) -> Result<Option<String>>
     .await
     .context("failed to query setting")?;
   Ok(row.map(|r| r.get("value")))
+}
+
+// wf_drug_interactions
+
+/// Fetches all drug interactions configured in the system.
+pub async fn get_all_drug_interactions(pool: &SqlitePool) -> Result<Vec<DrugInteraction>> {
+  let rows = sqlx::query(
+    "SELECT id, icode, drug_name, strength, interaction_type, created_at, updated_at \
+         FROM wf_drug_interactions ORDER BY drug_name, icode",
+  )
+  .fetch_all(pool)
+  .await
+  .context("failed to query drug interactions")?;
+
+  Ok(
+    rows
+      .iter()
+      .map(|r| DrugInteraction {
+        id: r.get("id"),
+        icode: r.get("icode"),
+        drug_name: r.get("drug_name"),
+        strength: r.try_get("strength").ok(),
+        interaction_type: r.get("interaction_type"),
+        created_at: r.get("created_at"),
+        updated_at: r.get("updated_at"),
+      })
+      .collect(),
+  )
+}
+
+/// Returns all configured drug interaction icodes.
+pub async fn get_drug_interaction_icodes(pool: &SqlitePool) -> Result<Vec<String>> {
+  let rows = sqlx::query("SELECT icode FROM wf_drug_interactions")
+    .fetch_all(pool)
+    .await
+    .context("failed to query drug interaction icodes")?;
+  Ok(rows.iter().map(|r| r.get("icode")).collect())
+}
+
+/// Adds a new drug interaction.
+pub async fn add_drug_interaction(pool: &SqlitePool, input: &DrugInteractionInput) -> Result<i64> {
+  let now = Utc::now().to_rfc3339();
+  let id = sqlx::query(
+    "INSERT INTO wf_drug_interactions \
+         (icode, drug_name, strength, interaction_type, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, ?, ?)",
+  )
+  .bind(&input.icode)
+  .bind(&input.drug_name)
+  .bind(&input.strength)
+  .bind(&input.interaction_type)
+  .bind(&now)
+  .bind(&now)
+  .execute(pool)
+  .await
+  .context("failed to add drug interaction")?
+  .last_insert_rowid();
+
+  Ok(id)
+}
+
+/// Deletes a drug interaction by ID.
+pub async fn delete_drug_interaction(pool: &SqlitePool, id: i64) -> Result<()> {
+  let result = sqlx::query("DELETE FROM wf_drug_interactions WHERE id = ?")
+    .bind(id)
+    .execute(pool)
+    .await
+    .context("failed to delete drug interaction")?;
+
+  if result.rows_affected() == 0 {
+    bail!("drug interaction not found: {id}");
+  }
+
+  Ok(())
 }
 
 // AppState

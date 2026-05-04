@@ -1,0 +1,223 @@
+use crate::db::mysql;
+use crate::models::interaction::{DrugInteraction, DrugInteractionInput};
+use serde::{Deserialize, Serialize};
+use sqlx::Row;
+use std::collections::BTreeMap;
+use tauri::State;
+use anyhow::Result;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HosxpDrugItem {
+    pub icode: String,
+    pub name: String,
+    pub strength: String,
+    pub units: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatientDrugInteractionRecord {
+    pub date: String,
+    pub drug_name: String,
+    pub strength: String,
+    pub icode: String,
+    pub interaction_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatientDrugInteractionSummary {
+    pub increase_count: i32,
+    pub decrease_count: i32,
+    pub trend: String,
+}
+
+#[tauri::command]
+pub async fn get_all_drug_interactions(
+    state: State<'_, crate::db::sqlite::AppState>,
+) -> Result<Vec<DrugInteraction>, String> {
+    crate::db::sqlite::get_all_drug_interactions(&state.pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn add_drug_interaction(
+    state: State<'_, crate::db::sqlite::AppState>,
+    input: DrugInteractionInput,
+) -> Result<i64, String> {
+    crate::db::sqlite::add_drug_interaction(&state.pool, &input)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_drug_interaction(
+    state: State<'_, crate::db::sqlite::AppState>,
+    id: i64,
+) -> Result<(), String> {
+    crate::db::sqlite::delete_drug_interaction(&state.pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn search_hosxp_drugs(
+    mysql_config: mysql::DbConfig,
+    keyword: String,
+) -> Result<Vec<HosxpDrugItem>, String> {
+    let pool = mysql::create_pool(&mysql_config)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let keyword_like = format!("%{}%", keyword.trim());
+
+    let rows = sqlx::query(
+        r#"
+            SELECT icode, name, strength, units
+            FROM drugitems
+            WHERE (name LIKE ? OR icode LIKE ?)
+              AND name IS NOT NULL
+              AND name <> ''
+            ORDER BY name
+            LIMIT 50
+            "#,
+    )
+    .bind(&keyword_like)
+    .bind(&keyword_like)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    Ok(
+        rows
+            .iter()
+            .map(|r| HosxpDrugItem {
+                icode: r.get("icode"),
+                name: r.try_get("name").unwrap_or_default(),
+                strength: r.try_get("strength").unwrap_or_default(),
+                units: r.try_get("units").unwrap_or_default(),
+            })
+            .collect(),
+    )
+}
+
+#[tauri::command]
+pub async fn get_patient_drug_interactions(
+    state: State<'_, crate::db::sqlite::AppState>,
+    mysql_config: mysql::DbConfig,
+    hn: String,
+) -> Result<(Vec<PatientDrugInteractionRecord>, PatientDrugInteractionSummary), String> {
+    let interaction_icodes = crate::db::sqlite::get_drug_interaction_icodes(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if interaction_icodes.is_empty() {
+        return Ok((
+            Vec::new(),
+            PatientDrugInteractionSummary {
+                increase_count: 0,
+                decrease_count: 0,
+                trend: "none".to_string(),
+            },
+        ));
+    }
+
+    // Get interaction types from SQLite
+    let all_interactions = crate::db::sqlite::get_all_drug_interactions(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    let interaction_types: BTreeMap<String, String> = all_interactions
+        .into_iter()
+        .map(|i| (i.icode, i.interaction_type))
+        .collect();
+
+    let pool = mysql::create_pool(&mysql_config).await.map_err(|e| e.to_string())?;
+
+    // Build query without date filter - HosXP uses Buddhist Era dates which are hard to compare
+    let icode_placeholders: Vec<String> = interaction_icodes.iter().map(|_| "?".to_string()).collect();
+    let query = format!(
+        r#"
+            SELECT
+                o.vstdate,
+                COALESCE(d.name, 'Unknown') AS drug_name,
+                COALESCE(d.strength, '') AS strength,
+                o.icode
+            FROM opitemrece o
+            LEFT JOIN drugitems d ON d.icode = o.icode
+            WHERE o.hn = ?
+              AND o.icode IN ({})
+            ORDER BY o.vstdate DESC
+            "#,
+        icode_placeholders.join(", ")
+    );
+
+    let mut builder = sqlx::query(&query).bind(&hn);
+    for icode in &interaction_icodes {
+        builder = builder.bind(icode);
+    }
+
+    let rows = builder
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let records: Vec<PatientDrugInteractionRecord> = rows
+        .iter()
+        .map(|r| {
+            let icode: String = r.get("icode");
+            let interaction_type = interaction_types
+                .get(&icode)
+                .cloned()
+                .unwrap_or_else(|| "increase".to_string());
+            let date = mysql::get_optional_date_string(r, "vstdate")
+                .unwrap_or_else(|| "".to_string());
+            PatientDrugInteractionRecord {
+                date,
+                drug_name: r.try_get("drug_name").unwrap_or_default(),
+                strength: r.try_get("strength").unwrap_or_default(),
+                icode,
+                interaction_type,
+            }
+        })
+        .collect();
+
+    // Deduplicate by icode - keep only the most recent date for each icode
+    let mut unique_by_icode: BTreeMap<String, PatientDrugInteractionRecord> = BTreeMap::new();
+    for record in records {
+        unique_by_icode.entry(record.icode.clone()).or_insert(record);
+    }
+    let mut unique_records: Vec<PatientDrugInteractionRecord> = unique_by_icode.into_values().collect();
+    // Sort by date descending (most recent first)
+    unique_records.sort_by(|a, b| b.date.cmp(&a.date));
+
+    let increase_count = unique_records
+        .iter()
+        .filter(|r| r.interaction_type == "increase")
+        .count() as i32;
+    let decrease_count = unique_records
+        .iter()
+        .filter(|r| r.interaction_type == "decrease")
+        .count() as i32;
+
+    let trend = if increase_count > decrease_count {
+        "increase".to_string()
+    } else if decrease_count > increase_count {
+        "decrease".to_string()
+    } else if increase_count == 0 && decrease_count == 0 {
+        "none".to_string()
+    } else {
+        "neutral".to_string()
+    };
+
+    Ok((
+        unique_records,
+        PatientDrugInteractionSummary {
+            increase_count,
+            decrease_count,
+            trend,
+        },
+    ))
+}

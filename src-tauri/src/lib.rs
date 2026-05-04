@@ -8,6 +8,10 @@ use commands::{
   alerts::get_patient_alerts,
   appointments::{get_appointments, schedule_appointment},
   inr::{get_inr_history, get_latest_inr},
+  interaction::{
+    add_drug_interaction, delete_drug_interaction, get_all_drug_interactions,
+    get_patient_drug_interactions, search_hosxp_drugs,
+  },
   outcomes::{get_outcomes, record_adverse_event},
   patients::{
     enroll_patient, get_active_patient_summaries, get_active_patients, get_patient_detail,
@@ -79,6 +83,11 @@ pub fn run() -> tauri::Result<()> {
       calculate_ttr,
       calculate_clinic_ttr,
       get_report_data,
+      get_all_drug_interactions,
+      add_drug_interaction,
+      delete_drug_interaction,
+      search_hosxp_drugs,
+      get_patient_drug_interactions,
     ])
     .run(tauri::generate_context!())
 }

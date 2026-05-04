@@ -50,7 +50,7 @@ impl DbConfig {
 
 // ── Connection helpers ────────────────────────────────────────────────────────
 
-async fn create_pool(config: &DbConfig) -> Result<sqlx::MySqlPool> {
+pub async fn create_pool(config: &DbConfig) -> Result<sqlx::MySqlPool> {
   MySqlPoolOptions::new()
     .max_connections(3)
     .acquire_timeout(std::time::Duration::from_secs(5))
@@ -105,7 +105,7 @@ fn resolve_search_window(filters: &SearchFilters) -> Result<(String, String)> {
   ))
 }
 
-fn get_optional_date_string(row: &MySqlRow, column: &str) -> Option<String> {
+pub fn get_optional_date_string(row: &MySqlRow, column: &str) -> Option<String> {
   row
     .try_get::<Option<NaiveDate>, _>(column)
     .ok()

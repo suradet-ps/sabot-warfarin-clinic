@@ -1,6 +1,7 @@
 pub mod alerts;
 pub mod appointments;
 pub mod inr;
+pub mod interaction;
 pub mod outcomes;
 pub mod patients;
 pub mod reports;

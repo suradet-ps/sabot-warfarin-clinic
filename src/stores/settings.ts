@@ -2,6 +2,23 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 
+export interface DrugInteraction {
+  id: number
+  icode: string
+  drugName: string
+  strength: string | null
+  interactionType: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HosxpDrugItem {
+  icode: string
+  name: string
+  strength: string
+  units: string
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const mysqlConfig = ref({
     host: 'localhost',
@@ -13,6 +30,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const hospitalName = ref('โรงพยาบาลสระโบสถ์')
   const staffList = ref<string[]>([])
   const isConnected = ref(false)
+  const drugInteractions = ref<DrugInteraction[]>([])
 
   async function testConnection() {
     try {
@@ -20,7 +38,8 @@ export const useSettingsStore = defineStore('settings', () => {
         config: mysqlConfig.value,
       })
       return isConnected.value
-    } catch {
+    } catch (e) {
+      console.error('Connection test failed:', e)
       isConnected.value = false
       return false
     }
@@ -36,5 +55,48 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  return { mysqlConfig, hospitalName, staffList, isConnected, testConnection, loadSettings }
+  async function loadDrugInteractions() {
+    try {
+      drugInteractions.value = await invoke<DrugInteraction[]>('get_all_drug_interactions')
+    } catch (e) {
+      console.error('Failed to load drug interactions:', e)
+    }
+  }
+
+  async function addDrugInteraction(input: {
+    icode: string
+    drugName: string
+    strength: string | null
+    interactionType: string
+  }) {
+    const id = await invoke<number>('add_drug_interaction', { input })
+    await loadDrugInteractions()
+    return id
+  }
+
+  async function deleteDrugInteraction(id: number) {
+    await invoke('delete_drug_interaction', { id })
+    await loadDrugInteractions()
+  }
+
+  async function searchHosxpDrugs(keyword: string): Promise<HosxpDrugItem[]> {
+    return invoke<HosxpDrugItem[]>('search_hosxp_drugs', {
+      mysqlConfig: mysqlConfig.value,
+      keyword,
+    })
+  }
+
+  return {
+    mysqlConfig,
+    hospitalName,
+    staffList,
+    isConnected,
+    drugInteractions,
+    testConnection,
+    loadSettings,
+    loadDrugInteractions,
+    addDrugInteraction,
+    deleteDrugInteraction,
+    searchHosxpDrugs,
+  }
 })

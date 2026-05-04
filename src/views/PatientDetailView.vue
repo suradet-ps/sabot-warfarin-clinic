@@ -2,30 +2,34 @@
 import { computed, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useRoute, useRouter } from 'vue-router'
-import { Activity, CalendarDays, FileClock, FilePenLine, Pill, ShieldAlert } from 'lucide-vue-next'
+import { Activity, CalendarDays, FileClock, FilePenLine, Pill, ShieldAlert, ActivitySquare } from 'lucide-vue-next'
 import AdverseEventList from '#/components/patient/AdverseEventList.vue'
 import AppointmentTimeline from '#/components/patient/AppointmentTimeline.vue'
 import DispensingTable from '#/components/patient/DispensingTable.vue'
 import InrTrendChart from '#/components/patient/InrTrendChart.vue'
 import StatusChangeModal from '#/components/patient/StatusChangeModal.vue'
 import VisitList from '#/components/patient/VisitList.vue'
+import DrugInteractionTable from '#/components/patient/DrugInteractionTable.vue'
 import TtrBadge from '#/components/active/TtrBadge.vue'
 import StatusBadge from '#/components/shared/StatusBadge.vue'
 import VisitFormPanel from '#/components/visit/VisitFormPanel.vue'
 import type { PatientDetail } from '#/types/patient'
 import type { WfVisit } from '#/types/visit'
+import { useSettingsStore } from '#/stores/settings'
 import { calculateAge, formatThaiDate, patientFullName, sexLabel } from '#/utils/clinic'
 
 const route = useRoute()
 const router = useRouter()
 const hn = route.params.hn as string
+const settingsStore = useSettingsStore()
 
-type TabKey = 'inr' | 'visits' | 'dispensing' | 'appointments' | 'adverse'
+type TabKey = 'inr' | 'visits' | 'dispensing' | 'interactions' | 'appointments' | 'adverse'
 const activeTab = ref<TabKey>('inr')
 const tabs: { key: TabKey; label: string; icon: unknown }[] = [
   { key: 'inr', label: 'INR', icon: Activity },
   { key: 'visits', label: 'ประวัติการทำคลินิก', icon: FileClock },
   { key: 'dispensing', label: 'ประวัติยา', icon: Pill },
+  { key: 'interactions', label: 'Drug interaction', icon: ActivitySquare },
   { key: 'appointments', label: 'นัดหมาย', icon: CalendarDays },
   { key: 'adverse', label: 'เหตุการณ์', icon: ShieldAlert },
 ]
@@ -173,6 +177,12 @@ onMounted(() => { void loadPatient() })
         <DispensingTable
           v-else-if="activeTab === 'dispensing'"
           :records="patientDetail.dispensingHistory ?? []"
+        />
+
+        <DrugInteractionTable
+          v-else-if="activeTab === 'interactions'"
+          :hn="hn"
+          :mysql-config="settingsStore.mysqlConfig"
         />
 
         <AppointmentTimeline v-else-if="activeTab === 'appointments'" :key="appointmentTimelineKey" :hn="hn" />
