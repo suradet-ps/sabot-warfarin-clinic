@@ -15,7 +15,7 @@ const pendingReviewCount = ref(0)
 const navItems = [
   { name: 'screening', label: 'คัดกรอง', icon: Search, path: '/screening' },
   { name: 'active', label: 'ผู้ป่วยทั้งหมด', icon: Users, path: '/active' },
-  { name: 'review', label: 'ตรวจสอบการทำคลินิก', icon: ClipboardCheck, path: '/review' },
+  { name: 'review', label: 'ตรวจสอบ', icon: ClipboardCheck, path: '/review' },
   { name: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports' },
   { name: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings' },
 ]
