@@ -375,15 +375,29 @@ function daysFromNow(dateStr: string | null): string {
 
     <div class="footer-section">
       <div class="signature-area">
-        <div class="signature-box">
-          <span class="label">Pharmacist Notes</span>
-          <div class="sig-line" />
-          <div class="sig-line" />
+        <div class="signature-box pharmacist-box">
+          <div class="box-header">
+            <span class="label">Pharmacist Notes</span>
+          </div>
+          <div class="box-body">
+            <div class="notes-space"></div>
+            <div class="signature-line">
+              <span class="line-label">ลงชื่อ</span>
+              <span class="line-space"></span>
+            </div>
+          </div>
         </div>
-        <div class="signature-box">
-          <span class="label">ลายมือชื่อแพทย์</span>
-          <div class="sig-line" />
-          <div class="sig-line" />
+        <div class="signature-box doctor-box">
+          <div class="box-header">
+            <span class="label">Doctor Notes</span>
+          </div>
+          <div class="box-body">
+            <div class="notes-space"></div>
+            <div class="signature-line">
+              <span class="line-label">ลงชื่อ</span>
+              <span class="line-space"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -475,13 +489,13 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .inr-today .label {
-  font-size: var(--typography-subtitle-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
   font-weight: 600;
 }
 
 .inr-value {
-  font-size: 2.8rem;
+  font-size: 2.2rem;
   font-weight: 700;
   color: var(--color-primary);
   line-height: 1;
@@ -654,25 +668,57 @@ function daysFromNow(dateStr: string | null): string {
 .signature-area {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .signature-box {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  border: 2px solid var(--color-hairline);
+  border-radius: var(--rounded-lg);
+  overflow: hidden;
 }
 
-.signature-box .label {
+.box-header {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.box-header .label {
+  font-size: var(--typography-body-md-size);
+  font-weight: 700;
+}
+
+.pharmacist-box .box-header {
+  background: #f0f4ff;
+  color: var(--color-brand-blue);
+}
+
+.doctor-box .box-header {
+  background: #e6faf9;
+  color: var(--color-brand-teal);
+}
+
+.box-body {
+  padding: var(--spacing-md);
+}
+
+.notes-space {
+  height: 40px;
+}
+
+.signature-line {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.line-label {
   font-size: var(--typography-body-md-size);
   color: var(--color-slate);
-  font-weight: 600;
 }
 
-.sig-line {
-  height: 1px;
-  background: var(--color-hairline);
-  margin: var(--spacing-md) 0 var(--spacing-xs);
+.line-space {
+  flex: 1;
+  border-bottom: 1px solid var(--color-ink);
 }
 
 .doctor-name {
@@ -763,17 +809,29 @@ function daysFromNow(dateStr: string | null): string {
     padding: var(--spacing-xs);
   }
 
-  .footer-section {
+.footer-section {
     gap: var(--spacing-xs);
     padding-top: var(--spacing-xs);
   }
 
   .signature-area {
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
   }
 
-  .sig-line {
-    margin: var(--spacing-sm) 0 2px;
+  .signature-box {
+    border-width: 1px;
+  }
+
+  .box-header {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .box-body {
+    padding: var(--spacing-sm);
+  }
+
+  .notes-space {
+    height: 24px;
   }
 }
 </style>
