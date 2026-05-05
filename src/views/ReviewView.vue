@@ -167,7 +167,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
-  padding: var(--spacing-xl);
 }
 
 .page-toolbar {

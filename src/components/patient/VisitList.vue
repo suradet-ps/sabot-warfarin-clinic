@@ -87,10 +87,6 @@ function adherenceBadgeClass(a?: string | null) {
       </div>
 
       <div v-if="expandedIds.has(v.id)" class="visit-detail">
-        <div v-if="v.physician" class="detail-row">
-          <span class="caption" style="color: var(--color-slate)">แพทย์:</span>
-          <span class="body-sm">{{ v.physician }}</span>
-        </div>
         <div v-if="v.nextAppointment" class="detail-row">
           <span class="caption" style="color: var(--color-slate)">นัดต่อไป:</span>
           <span class="body-sm">{{ formatThaiDate(v.nextAppointment) }}</span>
