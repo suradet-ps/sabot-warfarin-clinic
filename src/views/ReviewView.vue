@@ -3,9 +3,11 @@ import { onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { ClipboardCheck, Pencil, Search } from 'lucide-vue-next'
 import VisitFormPanel from '#/components/visit/VisitFormPanel.vue'
+import { useReviewStore } from '#/stores/review'
 import { formatThaiDate } from '#/utils/clinic'
 import type { WfVisit } from '#/types/visit'
 
+const reviewStore = useReviewStore()
 const visits = ref<WfVisit[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -35,19 +37,11 @@ async function approveVisit(visitId: number) {
       reviewer: 'เภสัชกร',
     })
     visits.value = visits.value.filter((v) => v.id !== visitId)
-    await refreshPendingCount()
+    await reviewStore.fetchPendingCount()
   } catch (e) {
     console.error('failed to approve visit', e)
   } finally {
     approving.value.delete(visitId)
-  }
-}
-
-async function refreshPendingCount() {
-  try {
-    await invoke('get_pending_review_count')
-  } catch (e) {
-    console.error('failed to refresh count', e)
   }
 }
 
@@ -61,12 +55,14 @@ async function onVisitSaved(visitId: number) {
   visitPanelOpen.value = false
   editingVisit.value = null
   await loadVisits()
+  await reviewStore.fetchPendingCount()
 }
 
 async function handleVisitUpdated() {
   visitPanelOpen.value = false
   editingVisit.value = null
   await loadVisits()
+  await reviewStore.fetchPendingCount()
 }
 
 const filteredVisits = () => {

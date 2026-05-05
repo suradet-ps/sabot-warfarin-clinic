@@ -1,16 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { invoke } from '@tauri-apps/api/core'
 import { BarChart3, ClipboardCheck, Search, Settings, Users } from 'lucide-vue-next'
 import { useAlertStore } from '#/stores/alerts'
+import { useReviewStore } from '#/stores/review'
 import { useSettingsStore } from '#/stores/settings'
 
 const route = useRoute()
 const alertStore = useAlertStore()
+const reviewStore = useReviewStore()
 const settingsStore = useSettingsStore()
-
-const pendingReviewCount = ref(0)
 
 const navItems = [
   { name: 'screening', label: 'คัดกรอง', icon: Search, path: '/screening' },
@@ -21,17 +20,10 @@ const navItems = [
 ]
 
 const totalAlerts = computed(() => alertStore.criticalCount + alertStore.warningCount)
-
-async function fetchPendingCount() {
-  try {
-    pendingReviewCount.value = await invoke<number>('get_pending_review_count')
-  } catch (e) {
-    console.error('failed to fetch pending review count', e)
-  }
-}
+const pendingReviewCount = computed(() => reviewStore.pendingCount)
 
 onMounted(() => {
-  void Promise.all([alertStore.fetchAlerts(), settingsStore.loadSettings(), fetchPendingCount()])
+  void Promise.all([alertStore.fetchAlerts(), settingsStore.loadSettings(), reviewStore.fetchPendingCount()])
 })
 </script>
 
