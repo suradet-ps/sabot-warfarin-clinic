@@ -423,12 +423,12 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .slip-title strong {
-  font-size: var(--typography-heading-3-size);
+  font-size: var(--typography-subtitle-size);
   color: var(--color-primary);
 }
 
 .slip-subtitle {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
 }
 
@@ -446,13 +446,14 @@ function daysFromNow(dateStr: string | null): string {
 .patient-table td {
   padding: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid var(--color-hairline);
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
 }
 
 .patient-table .label {
   display: block;
-  font-size: var(--typography-caption-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
+  font-weight: 600;
   margin-bottom: 2px;
 }
 
@@ -474,8 +475,9 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .inr-today .label {
-  font-size: var(--typography-caption-size);
+  font-size: var(--typography-subtitle-size);
   color: var(--color-slate);
+  font-weight: 600;
 }
 
 .inr-value {
@@ -518,7 +520,7 @@ function daysFromNow(dateStr: string | null): string {
   padding: 6px;
   text-align: center;
   border: 1px solid var(--color-hairline);
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
 }
 
 .dose-table th {
@@ -545,8 +547,9 @@ function daysFromNow(dateStr: string | null): string {
 
 .dose-instructions .label {
   display: block;
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
+  font-weight: 600;
 }
 
 .dose-instructions :deep(.option-card) {
@@ -589,9 +592,9 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .adr-section .label {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .adr-group {
@@ -600,18 +603,19 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .adr-category {
-  font-size: var(--typography-caption-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
+  font-weight: 600;
 }
 
 .adr-items {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-brand-coral);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .adr-none {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-stone);
 }
 
@@ -633,8 +637,9 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .appointment-info .label {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
+  font-weight: 600;
 }
 
 .appointment-info strong {
@@ -642,7 +647,7 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .days-from-now {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
 }
 
@@ -659,8 +664,9 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .signature-box .label {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-slate);
+  font-weight: 600;
 }
 
 .sig-line {
@@ -670,7 +676,7 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .doctor-name {
-  font-size: var(--typography-body-sm-size);
+  font-size: var(--typography-body-md-size);
   color: var(--color-ink);
 }
 
