@@ -8,6 +8,7 @@ const router = createRouter({
     { path: '/active', name: 'active', component: () => import('#/views/ActiveView.vue') },
     { path: '/patient/:hn', name: 'patient-detail', component: () => import('#/views/PatientDetailView.vue') },
     { path: '/slip/:visitId', name: 'slip', component: () => import('#/views/SlipView.vue') },
+    { path: '/review', name: 'review', component: () => import('#/views/ReviewView.vue') },
     { path: '/reports', name: 'reports', component: () => import('#/views/ReportsView.vue') },
     { path: '/settings', name: 'settings', component: () => import('#/views/SettingsView.vue') },
   ],

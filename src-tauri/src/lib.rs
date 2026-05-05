@@ -25,7 +25,8 @@ use commands::{
   },
   slip::save_slip_pdf,
   visits::{
-    delete_visit, get_visit_by_id, get_visit_history, save_visit, suggest_dose, update_visit,
+    approve_visit, delete_visit, get_pending_review_count, get_pending_review_visits,
+    get_visit_by_id, get_visit_history, save_visit, suggest_dose, update_visit,
   },
 };
 use db::sqlite::{AppState, init_pool};
@@ -96,6 +97,9 @@ pub fn run() -> tauri::Result<()> {
       search_hosxp_drugs,
       get_patient_drug_interactions,
       save_slip_pdf,
+      get_pending_review_visits,
+      get_pending_review_count,
+      approve_visit,
     ])
     .run(tauri::generate_context!())
 }

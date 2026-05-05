@@ -51,7 +51,6 @@ const newDoseMgday = ref<number | null>(null)
 const newDoseDetail = ref(emptyDoseSchedule())
 const nextAppointment = ref('')
 const nextInrDue = ref('')
-const physician = ref('')
 const adherence = ref<'good' | 'fair' | 'poor'>('good')
 const notes = ref('')
 const suggestion = ref<DoseSuggestion | null>(null)
@@ -103,7 +102,6 @@ async function loadDefaults() {
     newDoseDetail.value = normalizeDoseSchedule(props.editVisit.newDoseDetail)
     nextAppointment.value = props.editVisit.nextAppointment ?? ''
     nextInrDue.value = props.editVisit.nextInrDue ?? ''
-    physician.value = props.editVisit.physician ?? ''
     adherence.value = (props.editVisit.adherence as typeof adherence.value) ?? 'good'
     notes.value = props.editVisit.notes ?? ''
     selectedSideEffects.value = props.editVisit.sideEffects ?? []
@@ -306,7 +304,6 @@ async function handleSubmit() {
       doseChanged: doseChanged.value,
       nextAppointment: nextAppointment.value || undefined,
       nextInrDue: nextInrDue.value || undefined,
-      physician: physician.value || undefined,
       adherence: adherence.value,
       sideEffects: selectedSideEffects.value.length > 0 ? selectedSideEffects.value : null,
       notes: notes.value || undefined,
@@ -411,10 +408,6 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
             <label class="form-field">
               <span class="caption label">นัดครั้งต่อไป</span>
               <input class="input" type="date" v-model="nextAppointment" />
-            </label>
-            <label class="form-field">
-              <span class="caption label">แพทย์</span>
-              <input class="input" v-model="physician" />
             </label>
           </div>
 

@@ -481,7 +481,8 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
     "SELECT id, hn, visit_date, inr_value, inr_source, \
          current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
          dose_changed, next_appointment, next_inr_due, \
-         physician, notes, side_effects, adherence, created_by, created_at \
+         physician, notes, side_effects, adherence, created_by, created_at, \
+         reviewed_at, reviewed_by \
          FROM wf_visits WHERE hn = ? ORDER BY visit_date DESC",
   )
   .bind(hn)
@@ -549,6 +550,8 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
         created_at: r.get("created_at"),
         total_pills_summary,
         selected_dose_option,
+        reviewed_at: r.try_get("reviewed_at").ok(),
+        reviewed_by: r.try_get("reviewed_by").ok(),
       })
     })
     .collect()
@@ -559,7 +562,8 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
     "SELECT id, hn, visit_date, inr_value, inr_source, \
          current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
          dose_changed, next_appointment, next_inr_due, \
-         physician, notes, side_effects, adherence, created_by, created_at \
+         physician, notes, side_effects, adherence, created_by, created_at, \
+         reviewed_at, reviewed_by \
          FROM wf_visits WHERE id = ?",
   )
   .bind(visit_id)
@@ -629,6 +633,8 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
       created_at: r.get("created_at"),
       total_pills_summary,
       selected_dose_option,
+      reviewed_at: r.try_get("reviewed_at").ok(),
+      reviewed_by: r.try_get("reviewed_by").ok(),
     }
   }))
 }
@@ -1016,6 +1022,114 @@ pub async fn delete_drug_interaction(pool: &SqlitePool, id: i64) -> Result<()> {
 
   if result.rows_affected() == 0 {
     bail!("drug interaction not found: {id}");
+  }
+
+  Ok(())
+}
+
+/// Returns visits pending review (no reviewed_at), newest first.
+pub async fn get_pending_review_visits(pool: &SqlitePool) -> Result<Vec<WfVisit>> {
+  let rows = sqlx::query(
+    "SELECT id, hn, visit_date, inr_value, inr_source, \
+         current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
+         dose_changed, next_appointment, next_inr_due, \
+         physician, notes, side_effects, adherence, created_by, created_at, \
+         reviewed_at, reviewed_by \
+         FROM wf_visits WHERE reviewed_at IS NULL ORDER BY visit_date DESC",
+  )
+  .fetch_all(pool)
+  .await
+  .context("failed to query pending review visits")?;
+
+  rows
+    .iter()
+    .map(|r| {
+      let dose_detail = r
+        .try_get::<Option<String>, _>("dose_detail")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<DoseSchedule>(&s).ok());
+      let new_dose_detail = r
+        .try_get::<Option<String>, _>("new_dose_detail")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<DoseSchedule>(&s).ok());
+      let side_effects = r
+        .try_get::<Option<String>, _>("side_effects")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<Vec<String>>(&s).ok())
+        .filter(|v| !v.is_empty());
+      let selected_dose_option = r
+        .try_get::<Option<String>, _>("selected_dose_option")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str::<RegimenOptionSnapshot>(&s).ok());
+      let dose_changed: i32 = r.try_get("dose_changed").unwrap_or(0);
+      let visit_date_str: String = r.get("visit_date");
+      let next_appt: Option<String> = r.try_get("next_appointment").ok();
+      let total_pills_summary = selected_dose_option
+        .as_ref()
+        .map(selected_option_summary)
+        .or_else(|| {
+          if let (Some(na), Some(nd)) = (&next_appt, &new_dose_detail) {
+            calculate_pills_summary(&visit_date_str, nd, na)
+          } else {
+            None
+          }
+        });
+
+      Ok(WfVisit {
+        id: r.get("id"),
+        hn: r.get("hn"),
+        visit_date: r.get("visit_date"),
+        inr_value: r.try_get("inr_value").ok(),
+        inr_source: r.try_get("inr_source").ok(),
+        current_dose_mgday: r.try_get("current_dose_mgday").ok(),
+        dose_detail,
+        new_dose_mgday: r.try_get("new_dose_mgday").ok(),
+        new_dose_detail,
+        new_dose_description: r.try_get("new_dose_description").ok(),
+        dose_changed: dose_changed != 0,
+        next_appointment: r.try_get("next_appointment").ok(),
+        next_inr_due: r.try_get("next_inr_due").ok(),
+        physician: r.try_get("physician").ok(),
+        notes: r.try_get("notes").ok(),
+        side_effects,
+        adherence: r.try_get("adherence").ok(),
+        created_by: r.try_get("created_by").ok(),
+        created_at: r.get("created_at"),
+        total_pills_summary,
+        selected_dose_option,
+        reviewed_at: r.try_get("reviewed_at").ok(),
+        reviewed_by: r.try_get("reviewed_by").ok(),
+      })
+    })
+    .collect()
+}
+
+/// Returns count of visits pending review.
+pub async fn get_pending_review_count(pool: &SqlitePool) -> Result<i64> {
+  let row = sqlx::query("SELECT COUNT(*) as cnt FROM wf_visits WHERE reviewed_at IS NULL")
+    .fetch_one(pool)
+    .await
+    .context("failed to count pending reviews")?;
+  Ok(row.get("cnt"))
+}
+
+/// Approves a visit (sets reviewed_at and reviewed_by).
+pub async fn approve_visit(pool: &SqlitePool, visit_id: i64, reviewer: &str) -> Result<()> {
+  let now = Utc::now().to_rfc3339();
+  let result = sqlx::query("UPDATE wf_visits SET reviewed_at = ?, reviewed_by = ? WHERE id = ?")
+    .bind(&now)
+    .bind(reviewer)
+    .bind(visit_id)
+    .execute(pool)
+    .await
+    .context("failed to approve visit")?;
+
+  if result.rows_affected() == 0 {
+    bail!("visit not found: {visit_id}");
   }
 
   Ok(())

@@ -93,6 +93,8 @@ pub struct WfVisit {
   pub created_at: String,
   pub total_pills_summary: Option<TotalPillsSummary>,
   pub selected_dose_option: Option<RegimenOptionSnapshot>,
+  pub reviewed_at: Option<String>,
+  pub reviewed_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -43,6 +43,8 @@ export interface WfVisit {
   createdAt: string
   totalPillsSummary?: TotalPillsSummary
   selectedDoseOption?: RegimenOption
+  reviewedAt?: string
+  reviewedBy?: string
 }
 
 export interface VisitInput {

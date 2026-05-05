@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { BarChart3, Search, Settings, Users } from 'lucide-vue-next'
+import { invoke } from '@tauri-apps/api/core'
+import { BarChart3, ClipboardCheck, Search, Settings, Users } from 'lucide-vue-next'
 import { useAlertStore } from '#/stores/alerts'
 import { useSettingsStore } from '#/stores/settings'
 
@@ -9,17 +10,28 @@ const route = useRoute()
 const alertStore = useAlertStore()
 const settingsStore = useSettingsStore()
 
+const pendingReviewCount = ref(0)
+
 const navItems = [
   { name: 'screening', label: 'คัดกรอง', icon: Search, path: '/screening' },
   { name: 'active', label: 'ผู้ป่วยทั้งหมด', icon: Users, path: '/active' },
+  { name: 'review', label: 'ตรวจสอบการทำคลินิก', icon: ClipboardCheck, path: '/review' },
   { name: 'reports', label: 'รายงาน', icon: BarChart3, path: '/reports' },
   { name: 'settings', label: 'ตั้งค่า', icon: Settings, path: '/settings' },
 ]
 
 const totalAlerts = computed(() => alertStore.criticalCount + alertStore.warningCount)
 
+async function fetchPendingCount() {
+  try {
+    pendingReviewCount.value = await invoke<number>('get_pending_review_count')
+  } catch (e) {
+    console.error('failed to fetch pending review count', e)
+  }
+}
+
 onMounted(() => {
-  void Promise.all([alertStore.fetchAlerts(), settingsStore.loadSettings()])
+  void Promise.all([alertStore.fetchAlerts(), settingsStore.loadSettings(), fetchPendingCount()])
 })
 </script>
 
@@ -41,7 +53,7 @@ onMounted(() => {
     </g>
   </svg><div class="sidebar-logo-text"><span class="sidebar-logo-title">วาร์ฟาริน</span><span class="sidebar-logo-sub">คลินิก</span></div></div>
     <ul class="sidebar-nav">
-      <li v-for="item in navItems" :key="item.name"><RouterLink :to="item.path" class="sidebar-nav-item" :class="{ active: route.path.startsWith(item.path) }"><component :is="item.icon" :size="20" /><span>{{ item.label }}</span><span v-if="item.name === 'active' && totalAlerts > 0" class="sidebar-badge">{{ totalAlerts }}</span></RouterLink></li>
+      <li v-for="item in navItems" :key="item.name"><RouterLink :to="item.path" class="sidebar-nav-item" :class="{ active: route.path.startsWith(item.path) }"><component :is="item.icon" :size="20" /><span>{{ item.label }}</span><span v-if="item.name === 'active' && totalAlerts > 0" class="sidebar-badge">{{ totalAlerts }}</span><span v-if="item.name === 'review' && pendingReviewCount > 0" class="sidebar-badge review-badge">{{ pendingReviewCount }}</span></RouterLink></li>
     </ul>
     <div class="sidebar-footer"><span class="micro footer-text">{{ settingsStore.hospitalName }}</span></div>
   </nav>
@@ -59,5 +71,6 @@ onMounted(() => {
 .sidebar-nav-item:hover { background: var(--color-surface-soft); }
 .sidebar-nav-item.active { background: var(--color-brand-teal); color: var(--color-on-dark); }
 .sidebar-badge { margin-left: auto; padding: 0 var(--spacing-xs); border-radius: var(--rounded-full); background: var(--color-brand-red-dark); color: var(--color-on-dark); }
+.review-badge { background: var(--color-brand-coral); }
 .sidebar-footer { padding: var(--spacing-xl); border-top: 1px solid var(--color-hairline-soft); margin-top: var(--spacing-xl); }
 </style>

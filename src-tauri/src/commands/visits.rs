@@ -4,8 +4,10 @@ use tauri::State;
 
 use crate::{
   db::sqlite::{
-    AppState, delete_visit as db_delete_visit, get_visit_by_id as db_get_visit_by_id,
-    get_visit_history as db_history, save_visit as db_save, update_visit as db_update_visit,
+    AppState, approve_visit as db_approve_visit, delete_visit as db_delete_visit,
+    get_pending_review_count as db_pending_count, get_pending_review_visits as db_pending,
+    get_visit_by_id as db_get_visit_by_id, get_visit_history as db_history, save_visit as db_save,
+    update_visit as db_update_visit,
   },
   dose::calculator::suggest_dose as suggest_dose_impl,
   models::visit::{DoseSuggestion, VisitInput, WfVisit},
@@ -65,6 +67,29 @@ pub async fn suggest_dose(
 #[tauri::command]
 pub async fn delete_visit(visit_id: i64, state: State<'_, AppState>) -> Result<(), String> {
   db_delete_visit(&state.pool, visit_id)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_pending_review_visits(state: State<'_, AppState>) -> Result<Vec<WfVisit>, String> {
+  db_pending(&state.pool).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_pending_review_count(state: State<'_, AppState>) -> Result<i64, String> {
+  db_pending_count(&state.pool)
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn approve_visit(
+  visit_id: i64,
+  reviewer: String,
+  state: State<'_, AppState>,
+) -> Result<(), String> {
+  db_approve_visit(&state.pool, visit_id, &reviewer)
     .await
     .map_err(|e| e.to_string())
 }

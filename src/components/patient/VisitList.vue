@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-vue-next'
+import { Check, ChevronDown, ChevronUp, Pencil, Trash2 } from 'lucide-vue-next'
 import type { WfVisit } from '#/types/visit'
 import { formatThaiDate, normalizeDoseSchedule, doseDayLabels, doseDayKeys } from '#/utils/clinic'
 import { useVisitStore } from '#/stores/visit'
@@ -64,6 +64,9 @@ function adherenceBadgeClass(a?: string | null) {
       <div class="visit-header" @click="toggleExpand(v.id)">
         <div class="visit-meta">
           <span class="body-sm-medium">{{ formatThaiDate(v.visitDate) }}</span>
+          <span v-if="v.reviewedAt" class="badge badge-success">
+            <Check :size="12" /> ยืนยันแล้ว
+          </span>
           <span v-if="v.inrValue != null" class="badge badge-tag-coral">INR {{ v.inrValue.toFixed(1) }}</span>
           <span v-if="v.newDoseMgday != null" class="caption" style="color: var(--color-slate)">
             ยา {{ (v.newDoseMgday * 7).toFixed(1) }} mg/สัปดาห์
