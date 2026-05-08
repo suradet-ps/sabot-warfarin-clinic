@@ -26,7 +26,7 @@ pub async fn schedule_appointment(
   appt: AppointmentInput,
   state: State<'_, AppState>,
 ) -> Result<i64, String> {
-  db_schedule(&state.pool, &appt)
+  db_schedule(&state.pool, &appt, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }

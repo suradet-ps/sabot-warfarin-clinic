@@ -1,6 +1,15 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import AppSidebar from '#/components/layout/AppSidebar.vue'
 import AppHeader from '#/components/layout/AppHeader.vue'
+import { useSyncStore } from '#/stores/sync'
+
+const syncStore = useSyncStore()
+
+onMounted(() => {
+  void syncStore.refreshAll()
+  syncStore.startAutoSync()
+})
 </script>
 
 <template>
