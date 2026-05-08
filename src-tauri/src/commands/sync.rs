@@ -78,10 +78,11 @@ fn build_rest_url(base_url: &str, table: &str, query: &[(&str, String)]) -> Resu
   Ok(url)
 }
 
-fn with_auth(builder: reqwest::RequestBuilder, anon_key: &str) -> reqwest::RequestBuilder {
+fn with_auth(builder: reqwest::RequestBuilder, anon_key: &str, machine_id: &str) -> reqwest::RequestBuilder {
   builder
     .header("apikey", anon_key)
     .header("Authorization", format!("Bearer {anon_key}"))
+    .header("x-machine-id", machine_id)
 }
 
 async fn ensure_sync_ids(
@@ -126,6 +127,7 @@ async fn push_rows<T>(
   client: &Client,
   url: &str,
   anon_key: &str,
+  machine_id: &str,
   table: &str,
   rows: &[T],
 ) -> Result<(), String>
@@ -137,7 +139,7 @@ where
   }
 
   let endpoint = build_rest_url(url, table, &[("on_conflict", "sync_id".to_string())])?;
-  let response = with_auth(client.post(endpoint), anon_key)
+  let response = with_auth(client.post(endpoint), anon_key, machine_id)
     .header("Prefer", "resolution=merge-duplicates,return=minimal")
     .json(rows)
     .send()
@@ -177,13 +179,14 @@ pub async fn save_supabase_config(
 }
 
 #[tauri::command]
-pub async fn test_supabase_connection(url: String, anon_key: String) -> Result<bool, String> {
+pub async fn test_supabase_connection(app: AppHandle, url: String, anon_key: String) -> Result<bool, String> {
+  let machine_id = get_or_create_machine_id(&app)?;
   let endpoint = build_rest_url(
     url.trim().trim_end_matches('/'),
     "wf_patients",
     &[("limit", "1".to_string())],
   )?;
-  let response = with_auth(supabase_client().get(endpoint), anon_key.trim())
+  let response = with_auth(supabase_client().get(endpoint), anon_key.trim(), &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?;
@@ -231,7 +234,7 @@ pub async fn push_to_supabase(
   .fetch_all(&state.pool)
   .await
   .map_err(|e| e.to_string())?;
-  if let Err(error) = push_rows(&client, &url, &anon_key, "wf_patients", &patient_rows).await {
+  if let Err(error) = push_rows(&client, &url, &anon_key, &machine_id, "wf_patients", &patient_rows).await {
     result.errors.push(format!("wf_patients: {error}"));
   } else {
     mark_synced(&state.pool, "wf_patients", &now).await?;
@@ -250,7 +253,7 @@ pub async fn push_to_supabase(
   .fetch_all(&state.pool)
   .await
   .map_err(|e| e.to_string())?;
-  if let Err(error) = push_rows(&client, &url, &anon_key, "wf_visits", &visit_rows).await {
+  if let Err(error) = push_rows(&client, &url, &anon_key, &machine_id, "wf_visits", &visit_rows).await {
     result.errors.push(format!("wf_visits: {error}"));
   } else {
     mark_synced(&state.pool, "wf_visits", &now).await?;
@@ -270,6 +273,7 @@ pub async fn push_to_supabase(
     &client,
     &url,
     &anon_key,
+    &machine_id,
     "wf_dose_history",
     &dose_history_rows,
   )
@@ -294,6 +298,7 @@ pub async fn push_to_supabase(
     &client,
     &url,
     &anon_key,
+    &machine_id,
     "wf_appointments",
     &appointment_rows,
   )
@@ -314,7 +319,7 @@ pub async fn push_to_supabase(
   .fetch_all(&state.pool)
   .await
   .map_err(|e| e.to_string())?;
-  if let Err(error) = push_rows(&client, &url, &anon_key, "wf_outcomes", &outcome_rows).await {
+  if let Err(error) = push_rows(&client, &url, &anon_key, &machine_id, "wf_outcomes", &outcome_rows).await {
     result.errors.push(format!("wf_outcomes: {error}"));
   } else {
     mark_synced(&state.pool, "wf_outcomes", &now).await?;
@@ -333,6 +338,7 @@ pub async fn push_to_supabase(
     &client,
     &url,
     &anon_key,
+    &machine_id,
     "wf_patient_status_history",
     &history_rows,
   )
@@ -359,6 +365,7 @@ pub async fn pull_from_supabase(
   state: State<'_, AppState>,
 ) -> Result<SyncResult, String> {
   let (url, anon_key) = get_supabase_config(&app)?;
+  let machine_id = get_or_create_machine_id(&app)?;
   let client = supabase_client();
   let store = app.store(STORE_FILE).map_err(|e| e.to_string())?;
   let last_pull_at = store
@@ -373,7 +380,7 @@ pub async fn pull_from_supabase(
     "wf_patients",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let patient_rows: Vec<WfPatientSync> = with_auth(client.get(patient_url), &anon_key)
+  let patient_rows: Vec<WfPatientSync> = with_auth(client.get(patient_url), &anon_key, &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?
@@ -432,7 +439,7 @@ pub async fn pull_from_supabase(
     "wf_visits",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let visit_rows: Vec<WfVisitSync> = with_auth(client.get(visit_url), &anon_key)
+  let visit_rows: Vec<WfVisitSync> = with_auth(client.get(visit_url), &anon_key, &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?
@@ -516,7 +523,7 @@ pub async fn pull_from_supabase(
     "wf_dose_history",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let dose_rows: Vec<WfDoseHistorySync> = with_auth(client.get(dose_url), &anon_key)
+  let dose_rows: Vec<WfDoseHistorySync> = with_auth(client.get(dose_url), &anon_key, &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?
@@ -576,7 +583,7 @@ pub async fn pull_from_supabase(
     "wf_appointments",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let appointment_rows: Vec<WfAppointmentSync> = with_auth(client.get(appointment_url), &anon_key)
+  let appointment_rows: Vec<WfAppointmentSync> = with_auth(client.get(appointment_url), &anon_key, &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?
@@ -632,7 +639,7 @@ pub async fn pull_from_supabase(
     "wf_outcomes",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let outcome_rows: Vec<WfOutcomeSync> = with_auth(client.get(outcome_url), &anon_key)
+  let outcome_rows: Vec<WfOutcomeSync> = with_auth(client.get(outcome_url), &anon_key, &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?
@@ -688,7 +695,7 @@ pub async fn pull_from_supabase(
     "wf_patient_status_history",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let history_rows: Vec<WfPatientStatusHistorySync> = with_auth(client.get(history_url), &anon_key)
+  let history_rows: Vec<WfPatientStatusHistorySync> = with_auth(client.get(history_url), &anon_key, &machine_id)
     .send()
     .await
     .map_err(|e| e.to_string())?

@@ -115,9 +115,33 @@ DROP POLICY IF EXISTS anon_all_wf_appointments ON wf_appointments;
 DROP POLICY IF EXISTS anon_all_wf_outcomes ON wf_outcomes;
 DROP POLICY IF EXISTS anon_all_wf_patient_status_history ON wf_patient_status_history;
 
-CREATE POLICY anon_all_wf_patients ON wf_patients FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY anon_all_wf_visits ON wf_visits FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY anon_all_wf_dose_history ON wf_dose_history FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY anon_all_wf_appointments ON wf_appointments FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY anon_all_wf_outcomes ON wf_outcomes FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY anon_all_wf_patient_status_history ON wf_patient_status_history FOR ALL TO anon USING (true) WITH CHECK (true);
+-- Machine-scoped RLS policies (no DELETE - use soft-delete via deleted_at)
+-- wf_patients
+CREATE POLICY anon_own_machine_wf_patients_select ON wf_patients FOR SELECT TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_patients_insert ON wf_patients FOR INSERT TO anon WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_patients_update ON wf_patients FOR UPDATE TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id') WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+
+-- wf_visits
+CREATE POLICY anon_own_machine_wf_visits_select ON wf_visits FOR SELECT TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_visits_insert ON wf_visits FOR INSERT TO anon WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_visits_update ON wf_visits FOR UPDATE TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id') WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+
+-- wf_dose_history
+CREATE POLICY anon_own_machine_wf_dose_history_select ON wf_dose_history FOR SELECT TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_dose_history_insert ON wf_dose_history FOR INSERT TO anon WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_dose_history_update ON wf_dose_history FOR UPDATE TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id') WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+
+-- wf_appointments
+CREATE POLICY anon_own_machine_wf_appointments_select ON wf_appointments FOR SELECT TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_appointments_insert ON wf_appointments FOR INSERT TO anon WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_appointments_update ON wf_appointments FOR UPDATE TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id') WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+
+-- wf_outcomes
+CREATE POLICY anon_own_machine_wf_outcomes_select ON wf_outcomes FOR SELECT TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_outcomes_insert ON wf_outcomes FOR INSERT TO anon WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_outcomes_update ON wf_outcomes FOR UPDATE TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id') WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+
+-- wf_patient_status_history
+CREATE POLICY anon_own_machine_wf_patient_status_history_select ON wf_patient_status_history FOR SELECT TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_patient_status_history_insert ON wf_patient_status_history FOR INSERT TO anon WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');
+CREATE POLICY anon_own_machine_wf_patient_status_history_update ON wf_patient_status_history FOR UPDATE TO anon USING (machine_id = current_setting('request.headers', true)::json->>'x-machine-id') WITH CHECK (machine_id = current_setting('request.headers', true)::json->>'x-machine-id');

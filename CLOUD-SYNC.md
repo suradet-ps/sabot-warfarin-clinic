@@ -6,7 +6,7 @@ Local-first architecture: SQLite is the primary source of truth for all operatio
 Supabase (PostgreSQL) serves as a cloud backup and sync layer, enabling the application
 to be installed on multiple machines without requiring them to share the same network.
 
-```
+```text
 [Machine A — Ward]                [Machine B — OPD]
   SQLite ──────────┐              SQLite ──────────┐
   (local data)     ▼              (local data)     ▼
@@ -50,7 +50,7 @@ The Rust backend encrypts the key with AES-256-GCM before writing it to disk.
 
 **Encryption scheme** (reuses `aes-gcm` + `rand` + `base64` already in `Cargo.toml`):
 
-```
+```text
 encrypt:  plaintext → AES-256-GCM → base64(nonce ‖ ciphertext) → write to store
 decrypt:  read store → base64 decode → split nonce | ciphertext → AES-256-GCM → plaintext
 ```
@@ -262,7 +262,7 @@ CREATE TABLE wf_patient_status_history (
     deleted_at       TIMESTAMPTZ
 );
 CREATE INDEX idx_wf_patient_status_history_hn_effective_date
-    ON wf_patient_status_history (hn, effective_date DESC, id DESC);
+    ON wf_patient_status_history (hn, effective_date DESC, sync_id DESC);
 
 -- RLS: allow anon key full access (internal hospital tool — no user isolation needed)
 ALTER TABLE wf_patients                ENABLE ROW LEVEL SECURITY;
@@ -286,7 +286,7 @@ CREATE POLICY "anon_all" ON wf_patient_status_history FOR ALL TO anon USING (tru
 
 > **Legend:** 🆕 = new file, 📝 = extend/modify existing file
 
-```
+```text
 src-tauri/src/
 ├── encrypt.rs                # 📝 EXTEND — add encrypt_value/decrypt_value with machine_id-derived key
 ├── commands/
@@ -401,70 +401,6 @@ pub fn decrypt_value(encoded: &str, machine_id: &str) -> Result<String, String> 
 
 #[cfg(test)]
 mod sync_tests {
-    use super::*;
-
-    #[test]
-    fn round_trip() {
-        let machine_id = "test-machine-id-1234";
-        let plaintext = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secret";
-        let encrypted = encrypt_value(plaintext, machine_id).unwrap();
-        let decrypted = decrypt_value(&encrypted, machine_id).unwrap();
-        assert_eq!(plaintext, decrypted);
-    }
-
-    #[test]
-    fn wrong_machine_id_fails() {
-        let encrypted = encrypt_value("secret", "machine-a").unwrap();
-        assert!(decrypt_value(&encrypted, "machine-b").is_err());
-    }
-}
-    key
-}
-
-/// Encrypt a plaintext string with AES-256-GCM.
-/// Returns a base64-encoded string of the form: base64(nonce || ciphertext).
-/// A fresh random 12-byte nonce is generated for every call.
-pub fn encrypt_value(plaintext: &str, machine_id: &str) -> Result<String, String> {
-    let raw_key = derive_key(machine_id);
-    let key = Key::<Aes256Gcm>::from_slice(&raw_key);
-    let cipher = Aes256Gcm::new(key);
-
-    let mut nonce_bytes = [0u8; 12];
-    OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
-
-    let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
-        .map_err(|e| format!("AES-GCM encrypt failed: {e}"))?;
-
-    let mut combined = nonce_bytes.to_vec();
-    combined.extend_from_slice(&ciphertext);
-    Ok(B64.encode(combined))
-}
-
-/// Decrypt a base64(nonce || ciphertext) string back to plaintext.
-pub fn decrypt_value(encoded: &str, machine_id: &str) -> Result<String, String> {
-    let combined = B64
-        .decode(encoded)
-        .map_err(|e| format!("Base64 decode failed: {e}"))?;
-    if combined.len() < 13 {
-        return Err("Ciphertext too short to contain a valid nonce".into());
-    }
-    let (nonce_bytes, ciphertext) = combined.split_at(12);
-    let raw_key = derive_key(machine_id);
-    let key = Key::<Aes256Gcm>::from_slice(&raw_key);
-    let cipher = Aes256Gcm::new(key);
-    let nonce = Nonce::from_slice(nonce_bytes);
-
-    let plaintext = cipher
-        .decrypt(nonce, ciphertext)
-        .map_err(|e| format!("AES-GCM decrypt failed: {e}"))?;
-
-    String::from_utf8(plaintext).map_err(|e| format!("UTF-8 decode failed: {e}"))
-}
-
-#[cfg(test)]
-mod tests {
     use super::*;
 
     #[test]

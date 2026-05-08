@@ -3,10 +3,13 @@ use aes_gcm::{
   aead::{Aead, KeyInit},
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use hkdf::Hkdf;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 
 const APP_SALT: &[u8] = b"sabot-warfarin-clinic-aes-v1";
+const HKDF_INFO: &[u8] = b"sabot-anon-key-v1";
 const NONCE_SIZE: usize = 12;
 const KEY_SIZE: usize = 32;
 
@@ -23,14 +26,9 @@ pub fn generate_key() -> [u8; KEY_SIZE] {
 }
 
 fn derive_key(machine_id: &str) -> [u8; KEY_SIZE] {
-  let mut input = machine_id.as_bytes().to_vec();
-  input.extend_from_slice(APP_SALT);
-
+  let hk = Hkdf::<Sha256>::new(Some(APP_SALT), machine_id.as_bytes());
   let mut key = [0u8; KEY_SIZE];
-  for (index, byte) in input.iter().enumerate() {
-    key[index % KEY_SIZE] ^= byte.wrapping_add(index as u8);
-  }
-
+  hk.expand(HKDF_INFO, &mut key).expect("HKDF expand should not fail");
   key
 }
 

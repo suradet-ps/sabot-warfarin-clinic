@@ -6,8 +6,12 @@ import { useSyncStore } from '#/stores/sync'
 
 const syncStore = useSyncStore()
 
-onMounted(() => {
-  void syncStore.refreshAll()
+onMounted(async () => {
+  try {
+    await syncStore.refreshAll()
+  } catch (error) {
+    console.error('Failed to refresh sync status:', error)
+  }
   syncStore.startAutoSync()
 })
 </script>

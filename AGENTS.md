@@ -584,6 +584,10 @@ async fn pull_from_supabase(app: tauri::AppHandle, sqlite: State<SqlitePool>) ->
 
 #[tauri::command]
 async fn get_sync_status(app: tauri::AppHandle, sqlite: State<SqlitePool>) -> Result<SyncStatus, String>
+
+#[tauri::command]
+async fn get_sync_summary(app: tauri::AppHandle) -> Result<SyncSummary, String>
+// Returns { has_anon_key: bool, supabase_url: String | null }
 ```
 
 ---

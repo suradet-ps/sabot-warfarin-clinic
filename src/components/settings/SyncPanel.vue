@@ -62,13 +62,13 @@ const statusBadgeClass = computed(() => {
     case 'success':
       return 'badge-success'
     case 'error':
-      return 'badge-danger'
+      return 'badge-tag-coral'
     case 'pushing':
     case 'pulling':
     case 'syncing':
-      return 'badge-info'
+      return 'badge-tag-purple'
     default:
-      return syncStore.info.configured ? 'badge-success' : 'badge-muted'
+      return syncStore.info.configured ? 'badge-success' : 'badge-tag-purple'
   }
 })
 
@@ -236,6 +236,8 @@ async function handlePull() {
           type="button"
           class="sync-toggle"
           :class="{ active: syncStore.autoSyncEnabled }"
+          role="switch"
+          :aria-checked="syncStore.autoSyncEnabled"
           @click="syncStore.autoSyncEnabled = !syncStore.autoSyncEnabled"
         >
           <span class="sync-toggle-dot" />
@@ -284,7 +286,7 @@ async function handlePull() {
   align-items: center;
   gap: var(--spacing-xs);
   margin-bottom: var(--spacing-sm);
-  padding: 4px 10px;
+  padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--rounded-full);
   background: var(--color-canvas);
   color: var(--color-moss-dark);
@@ -319,8 +321,8 @@ async function handlePull() {
 }
 
 .sync-icon-button {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: var(--touch-target-min, 44px);
+  min-width: var(--touch-target-min, 44px);
   padding: 0;
 }
 
@@ -372,7 +374,7 @@ async function handlePull() {
   border-radius: var(--rounded-full);
   background: var(--color-canvas);
   color: var(--color-ink);
-  min-height: 44px;
+  min-height: var(--touch-target-min, 44px);
   padding: 0 var(--spacing-md);
   cursor: pointer;
   font: inherit;
@@ -385,8 +387,8 @@ async function handlePull() {
 }
 
 .sync-toggle-dot {
-  width: 10px;
-  height: 10px;
+  width: var(--spacing-xs);
+  height: var(--spacing-xs);
   border-radius: var(--rounded-full);
   background: currentColor;
 }
