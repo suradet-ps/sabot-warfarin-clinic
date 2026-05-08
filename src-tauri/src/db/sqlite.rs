@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result, bail};
 use chrono::{Datelike, Utc};
-use sqlx::{Row, Sqlite, SqlitePool, Transaction, sqlite::SqlitePoolOptions};
+use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool, Transaction, sqlite::SqlitePoolOptions};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -674,6 +674,47 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
   }))
 }
 
+pub async fn get_latest_visit_dose_by_hns(
+  pool: &SqlitePool,
+  hns: &[String],
+) -> Result<std::collections::HashMap<String, Option<f64>>> {
+  if hns.is_empty() {
+    return Ok(std::collections::HashMap::new());
+  }
+
+  let mut builder = QueryBuilder::<Sqlite>::new(
+    "SELECT hn, dose FROM (\
+       SELECT hn, COALESCE(new_dose_mgday, current_dose_mgday) AS dose, \
+              ROW_NUMBER() OVER (PARTITION BY hn ORDER BY visit_date DESC, id DESC) AS row_num \
+         FROM wf_visits \
+        WHERE deleted_at IS NULL AND hn IN (",
+  );
+  {
+    let mut separated = builder.separated(", ");
+    for hn in hns {
+      separated.push_bind(hn);
+    }
+  }
+  builder.push(") ) ranked WHERE row_num = 1");
+
+  let rows = builder
+    .build()
+    .fetch_all(pool)
+    .await
+    .context("failed to query latest visit dose by HN")?;
+
+  Ok(
+    rows
+      .into_iter()
+      .map(|row| {
+        let hn: String = row.get("hn");
+        let dose = row.try_get::<Option<f64>, _>("dose").ok().flatten();
+        (hn, dose)
+      })
+      .collect(),
+  )
+}
+
 /// Returns INR values recorded via the clinic visit form (fallback).
 pub async fn get_inr_from_visits(pool: &SqlitePool, hn: &str) -> Result<Vec<InrRecord>> {
   let rows = sqlx::query(
@@ -999,6 +1040,39 @@ pub async fn get_outcomes(pool: &SqlitePool, hn: &str) -> Result<Vec<WfOutcome>>
         created_by: r.try_get("created_by").ok(),
         created_at: r.get("created_at"),
       })
+      .collect(),
+  )
+}
+
+pub async fn get_outcome_counts_by_hns(
+  pool: &SqlitePool,
+  hns: &[String],
+) -> Result<std::collections::HashMap<String, i64>> {
+  if hns.is_empty() {
+    return Ok(std::collections::HashMap::new());
+  }
+
+  let mut builder = QueryBuilder::<Sqlite>::new(
+    "SELECT hn, COUNT(*) AS outcome_count FROM wf_outcomes WHERE deleted_at IS NULL AND hn IN (",
+  );
+  {
+    let mut separated = builder.separated(", ");
+    for hn in hns {
+      separated.push_bind(hn);
+    }
+  }
+  builder.push(") GROUP BY hn");
+
+  let rows = builder
+    .build()
+    .fetch_all(pool)
+    .await
+    .context("failed to query outcome counts by HN")?;
+
+  Ok(
+    rows
+      .into_iter()
+      .map(|row| (row.get("hn"), row.get("outcome_count")))
       .collect(),
   )
 }

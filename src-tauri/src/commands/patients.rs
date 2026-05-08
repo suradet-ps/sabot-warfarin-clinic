@@ -8,8 +8,8 @@ use crate::{
     mysql::{get_dispensing_history, get_hosxp_patient},
     sqlite::{
       AppState, enroll_patient as db_enroll, get_active_patients as db_get_active,
-      get_inr_from_visits, get_patient_by_hn, get_pending_appointments, get_visit_history,
-      update_patient_status as db_update_status,
+      get_inr_from_visits, get_latest_visit_dose_by_hns, get_patient_by_hn,
+      get_pending_appointments, get_visit_history, update_patient_status as db_update_status,
     },
   },
   dose::calculator::calculate_ttr,
@@ -56,6 +56,9 @@ pub async fn get_active_patient_summaries(
   let appointments = get_pending_appointments(&state.pool)
     .await
     .unwrap_or_default();
+  let latest_dose_by_hn = get_latest_visit_dose_by_hns(&state.pool, &hns)
+    .await
+    .unwrap_or_default();
   let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
 
   let mut summaries = Vec::with_capacity(patients.len());
@@ -77,12 +80,7 @@ pub async fn get_active_patient_summaries(
       patient.target_inr_high,
       182,
     );
-    let current_dose_mgday = get_visit_history(&state.pool, &patient.hn)
-      .await
-      .unwrap_or_default()
-      .into_iter()
-      .next()
-      .and_then(|visit| visit.new_dose_mgday.or(visit.current_dose_mgday));
+    let current_dose_mgday = latest_dose_by_hn.get(&patient.hn).copied().flatten();
     let next_appointment = find_next_appointment(&appointments, &patient.hn, &today);
 
     summaries.push(ActivePatientSummary {
@@ -248,22 +246,48 @@ async fn try_get_dispensing_history(
 
 /// Returns INR records, preferring HOSxP MySQL (dual-source merge) and
 /// falling back to clinic-recorded INR values from `wf_visits`.
-pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord> {
+pub(crate) async fn get_inr_records_by_hns(
+  state: &AppState,
+  hns: &[String],
+) -> std::collections::HashMap<String, Vec<InrRecord>> {
+  if hns.is_empty() {
+    return std::collections::HashMap::new();
+  }
+
   let config_result = crate::commands::settings::get_mysql_config_internal(&state.pool)
     .await
     .ok()
     .flatten();
 
-  if let Some(config) = config_result
-    && let Ok(records) = crate::db::mysql::get_inr_history(&config, hn).await
-    && !records.is_empty()
-  {
-    return records;
+  let mut records_by_hn = if let Some(config) = config_result {
+    crate::db::mysql::get_dashboard_patient_data(&config, hns)
+      .await
+      .map(|(_, inr_map)| inr_map)
+      .unwrap_or_default()
+  } else {
+    std::collections::HashMap::new()
+  };
+
+  for hn in hns {
+    if records_by_hn.contains_key(hn) {
+      continue;
+    }
+
+    let fallback_records = get_inr_from_visits(&state.pool, hn)
+      .await
+      .unwrap_or_default();
+    if !fallback_records.is_empty() {
+      records_by_hn.insert(hn.clone(), fallback_records);
+    }
   }
 
-  get_inr_from_visits(&state.pool, hn)
-    .await
-    .unwrap_or_default()
+  records_by_hn
+}
+
+pub(crate) async fn get_inr_records(state: &AppState, hn: &str) -> Vec<InrRecord> {
+  let hns = vec![hn.to_string()];
+  let mut records_by_hn = get_inr_records_by_hns(state, &hns).await;
+  records_by_hn.remove(hn).unwrap_or_default()
 }
 
 fn find_next_appointment(

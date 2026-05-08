@@ -28,7 +28,8 @@ pub fn generate_key() -> [u8; KEY_SIZE] {
 fn derive_key(machine_id: &str) -> [u8; KEY_SIZE] {
   let hk = Hkdf::<Sha256>::new(Some(APP_SALT), machine_id.as_bytes());
   let mut key = [0u8; KEY_SIZE];
-  hk.expand(HKDF_INFO, &mut key).expect("HKDF expand should not fail");
+  hk.expand(HKDF_INFO, &mut key)
+    .expect("HKDF expand should not fail");
   key
 }
 

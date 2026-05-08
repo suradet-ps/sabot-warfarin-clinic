@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 use tauri::State;
 
 use crate::{
-  commands::patients::get_inr_records,
-  db::sqlite::{AppState, get_active_patients, get_outcomes},
+  commands::patients::{get_inr_records, get_inr_records_by_hns},
+  db::sqlite::{AppState, get_active_patients, get_outcome_counts_by_hns},
   dose::calculator::calculate_ttr as calc_ttr,
 };
 
@@ -57,11 +57,16 @@ pub async fn calculate_clinic_ttr(
   } else {
     window_days
   };
+  let hns: Vec<String> = patients.iter().map(|patient| patient.hn.clone()).collect();
+  let inr_records_by_hn = get_inr_records_by_hns(&state, &hns).await;
   let mut total = 0.0f64;
   let mut count = 0usize;
 
   for patient in &patients {
-    let inr_records = get_inr_records(&state, &patient.hn).await;
+    let inr_records = inr_records_by_hn
+      .get(&patient.hn)
+      .cloned()
+      .unwrap_or_default();
     let pairs: Vec<(String, f64)> = inr_records
       .iter()
       .map(|r| (r.date.clone(), r.value))
@@ -129,14 +134,11 @@ pub async fn get_report_data(
       let patients = get_active_patients(&state.pool)
         .await
         .map_err(|e| e.to_string())?;
-      let mut total_events = 0usize;
-
-      for patient in &patients {
-        let outcomes = get_outcomes(&state.pool, &patient.hn)
-          .await
-          .map_err(|e| e.to_string())?;
-        total_events += outcomes.len();
-      }
+      let hns: Vec<String> = patients.iter().map(|patient| patient.hn.clone()).collect();
+      let outcome_counts = get_outcome_counts_by_hns(&state.pool, &hns)
+        .await
+        .map_err(|e| e.to_string())?;
+      let total_events: usize = outcome_counts.values().map(|count| *count as usize).sum();
 
       Ok(json!({ "totalEvents": total_events }))
     }

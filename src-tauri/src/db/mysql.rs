@@ -10,10 +10,14 @@ use anyhow::{Context, Result, bail};
 use chrono::{Duration, NaiveDate, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{
-  MySql, QueryBuilder, Row,
+  MySql, MySqlPool, QueryBuilder, Row,
   mysql::{MySqlPoolOptions, MySqlRow},
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+  collections::{HashMap, HashSet},
+  sync::OnceLock,
+};
+use tokio::sync::RwLock;
 
 use crate::dose::usage_parser::parse_dispensing_usage;
 use crate::models::{
@@ -50,19 +54,48 @@ impl DbConfig {
 
 // ── Connection helpers ────────────────────────────────────────────────────────
 
+fn mysql_pool_cache() -> &'static RwLock<HashMap<String, MySqlPool>> {
+  static MYSQL_POOL_CACHE: OnceLock<RwLock<HashMap<String, MySqlPool>>> = OnceLock::new();
+  MYSQL_POOL_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
 pub async fn create_pool(config: &DbConfig) -> Result<sqlx::MySqlPool> {
-  MySqlPoolOptions::new()
+  let connection_url = config.connection_url();
+
+  if let Some(pool) = mysql_pool_cache()
+    .read()
+    .await
+    .get(&connection_url)
+    .cloned()
+  {
+    return Ok(pool);
+  }
+
+  let pool = MySqlPoolOptions::new()
     .max_connections(3)
     .acquire_timeout(std::time::Duration::from_secs(5))
-    .connect(&config.connection_url())
+    .connect(&connection_url)
     .await
-    .context("failed to connect to HOSxP MySQL")
+    .context("failed to connect to HOSxP MySQL")?;
+
+  let mut cache = mysql_pool_cache().write().await;
+  let cached = cache
+    .entry(connection_url)
+    .or_insert_with(|| pool.clone())
+    .clone();
+  Ok(cached)
 }
 
 /// Tests whether the given MySQL config can establish a connection.
 /// Returns `true` on success, `false` on any error.
 pub async fn test_mysql_connection(config: &DbConfig) -> bool {
-  create_pool(config).await.is_ok()
+  match create_pool(config).await {
+    Ok(pool) => sqlx::query_scalar::<_, i32>("SELECT 1")
+      .fetch_one(&pool)
+      .await
+      .is_ok(),
+    Err(_) => false,
+  }
 }
 
 fn default_search_window() -> (String, String) {

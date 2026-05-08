@@ -4,7 +4,7 @@ use chrono::{NaiveDate, Utc};
 use tauri::State;
 
 use crate::{
-  commands::patients::get_inr_records,
+  commands::patients::get_inr_records_by_hns,
   db::sqlite::{AppState, get_active_patients, get_pending_appointments},
   dose::calculator::calculate_ttr,
   models::alert::PatientAlert,
@@ -24,12 +24,17 @@ pub async fn get_patient_alerts(state: State<'_, AppState>) -> Result<Vec<Patien
   let pending_appts = get_pending_appointments(&state.pool)
     .await
     .unwrap_or_default();
+  let hns: Vec<String> = patients.iter().map(|patient| patient.hn.clone()).collect();
+  let inr_records_by_hn = get_inr_records_by_hns(&state, &hns).await;
 
   let today = Utc::now().date_naive();
   let mut alerts: Vec<PatientAlert> = Vec::new();
 
   for patient in &patients {
-    let inr_records = get_inr_records(&state, &patient.hn).await;
+    let inr_records = inr_records_by_hn
+      .get(&patient.hn)
+      .cloned()
+      .unwrap_or_default();
 
     let latest_inr = inr_records
       .iter()

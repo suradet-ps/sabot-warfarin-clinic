@@ -1,6 +1,7 @@
 use anyhow::Context;
 use reqwest::{Client, Url};
 use serde_json::json;
+use sqlx::{QueryBuilder, Sqlite};
 use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
@@ -78,7 +79,11 @@ fn build_rest_url(base_url: &str, table: &str, query: &[(&str, String)]) -> Resu
   Ok(url)
 }
 
-fn with_auth(builder: reqwest::RequestBuilder, anon_key: &str, machine_id: &str) -> reqwest::RequestBuilder {
+fn with_auth(
+  builder: reqwest::RequestBuilder,
+  anon_key: &str,
+  machine_id: &str,
+) -> reqwest::RequestBuilder {
   builder
     .header("apikey", anon_key)
     .header("Authorization", format!("Bearer {anon_key}"))
@@ -90,9 +95,10 @@ async fn ensure_sync_ids(
   table: &str,
   machine_id: &str,
 ) -> Result<(), String> {
+  let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
   let select_sql = format!("SELECT id FROM {table} WHERE sync_id IS NULL");
   let ids = sqlx::query_scalar::<_, i64>(&select_sql)
-    .fetch_all(pool)
+    .fetch_all(&mut *tx)
     .await
     .map_err(|e| e.to_string())?;
 
@@ -103,20 +109,41 @@ async fn ensure_sync_ids(
       .bind(Uuid::new_v4().to_string())
       .bind(machine_id)
       .bind(row_id)
-      .execute(pool)
+      .execute(&mut *tx)
       .await
       .map_err(|e| e.to_string())?;
   }
 
+  tx.commit().await.map_err(|e| e.to_string())?;
   Ok(())
 }
 
-async fn mark_synced(pool: &sqlx::SqlitePool, table: &str, synced_at: &str) -> Result<(), String> {
-  let update_sql = format!(
-    "UPDATE {table} SET synced_at = ? WHERE sync_id IS NOT NULL AND (synced_at IS NULL OR updated_at > synced_at)"
-  );
-  sqlx::query(&update_sql)
-    .bind(synced_at)
+fn sync_ids_from_rows<T>(rows: &[T], get_sync_id: impl Fn(&T) -> Option<&String>) -> Vec<String> {
+  rows.iter().filter_map(get_sync_id).cloned().collect()
+}
+
+async fn mark_rows_synced(
+  pool: &sqlx::SqlitePool,
+  table: &str,
+  sync_ids: &[String],
+  synced_at: &str,
+) -> Result<(), String> {
+  if sync_ids.is_empty() {
+    return Ok(());
+  }
+
+  let mut builder = QueryBuilder::<Sqlite>::new(format!("UPDATE {table} SET synced_at = "));
+  builder.push_bind(synced_at).push(" WHERE sync_id IN (");
+  {
+    let mut separated = builder.separated(", ");
+    for sync_id in sync_ids {
+      separated.push_bind(sync_id);
+    }
+  }
+  builder.push(")");
+
+  builder
+    .build()
     .execute(pool)
     .await
     .map_err(|e| e.to_string())?;
@@ -129,6 +156,7 @@ async fn push_rows<T>(
   anon_key: &str,
   machine_id: &str,
   table: &str,
+  conflict_target: &str,
   rows: &[T],
 ) -> Result<(), String>
 where
@@ -138,7 +166,7 @@ where
     return Ok(());
   }
 
-  let endpoint = build_rest_url(url, table, &[("on_conflict", "sync_id".to_string())])?;
+  let endpoint = build_rest_url(url, table, &[("on_conflict", conflict_target.to_string())])?;
   let response = with_auth(client.post(endpoint), anon_key, machine_id)
     .header("Prefer", "resolution=merge-duplicates,return=minimal")
     .json(rows)
@@ -179,17 +207,25 @@ pub async fn save_supabase_config(
 }
 
 #[tauri::command]
-pub async fn test_supabase_connection(app: AppHandle, url: String, anon_key: String) -> Result<bool, String> {
+pub async fn test_supabase_connection(
+  app: AppHandle,
+  url: String,
+  anon_key: String,
+) -> Result<bool, String> {
   let machine_id = get_or_create_machine_id(&app)?;
   let endpoint = build_rest_url(
     url.trim().trim_end_matches('/'),
     "wf_patients",
     &[("limit", "1".to_string())],
   )?;
-  let response = with_auth(supabase_client().get(endpoint), anon_key.trim(), &machine_id)
-    .send()
-    .await
-    .map_err(|e| e.to_string())?;
+  let response = with_auth(
+    supabase_client().get(endpoint),
+    anon_key.trim(),
+    &machine_id,
+  )
+  .send()
+  .await
+  .map_err(|e| e.to_string())?;
   Ok(response.status().is_success())
 }
 
@@ -234,10 +270,21 @@ pub async fn push_to_supabase(
   .fetch_all(&state.pool)
   .await
   .map_err(|e| e.to_string())?;
-  if let Err(error) = push_rows(&client, &url, &anon_key, &machine_id, "wf_patients", &patient_rows).await {
+  if let Err(error) = push_rows(
+    &client,
+    &url,
+    &anon_key,
+    &machine_id,
+    "wf_patients",
+    "hn",
+    &patient_rows,
+  )
+  .await
+  {
     result.errors.push(format!("wf_patients: {error}"));
   } else {
-    mark_synced(&state.pool, "wf_patients", &now).await?;
+    let sync_ids = sync_ids_from_rows(&patient_rows, |row| row.sync_id.as_ref());
+    mark_rows_synced(&state.pool, "wf_patients", &sync_ids, &now).await?;
     result.pushed += patient_rows.len();
   }
 
@@ -253,10 +300,21 @@ pub async fn push_to_supabase(
   .fetch_all(&state.pool)
   .await
   .map_err(|e| e.to_string())?;
-  if let Err(error) = push_rows(&client, &url, &anon_key, &machine_id, "wf_visits", &visit_rows).await {
+  if let Err(error) = push_rows(
+    &client,
+    &url,
+    &anon_key,
+    &machine_id,
+    "wf_visits",
+    "sync_id",
+    &visit_rows,
+  )
+  .await
+  {
     result.errors.push(format!("wf_visits: {error}"));
   } else {
-    mark_synced(&state.pool, "wf_visits", &now).await?;
+    let sync_ids = sync_ids_from_rows(&visit_rows, |row| row.sync_id.as_ref());
+    mark_rows_synced(&state.pool, "wf_visits", &sync_ids, &now).await?;
     result.pushed += visit_rows.len();
   }
 
@@ -275,13 +333,15 @@ pub async fn push_to_supabase(
     &anon_key,
     &machine_id,
     "wf_dose_history",
+    "sync_id",
     &dose_history_rows,
   )
   .await
   {
     result.errors.push(format!("wf_dose_history: {error}"));
   } else {
-    mark_synced(&state.pool, "wf_dose_history", &now).await?;
+    let sync_ids = sync_ids_from_rows(&dose_history_rows, |row| row.sync_id.as_ref());
+    mark_rows_synced(&state.pool, "wf_dose_history", &sync_ids, &now).await?;
     result.pushed += dose_history_rows.len();
   }
 
@@ -300,13 +360,15 @@ pub async fn push_to_supabase(
     &anon_key,
     &machine_id,
     "wf_appointments",
+    "sync_id",
     &appointment_rows,
   )
   .await
   {
     result.errors.push(format!("wf_appointments: {error}"));
   } else {
-    mark_synced(&state.pool, "wf_appointments", &now).await?;
+    let sync_ids = sync_ids_from_rows(&appointment_rows, |row| row.sync_id.as_ref());
+    mark_rows_synced(&state.pool, "wf_appointments", &sync_ids, &now).await?;
     result.pushed += appointment_rows.len();
   }
 
@@ -319,10 +381,21 @@ pub async fn push_to_supabase(
   .fetch_all(&state.pool)
   .await
   .map_err(|e| e.to_string())?;
-  if let Err(error) = push_rows(&client, &url, &anon_key, &machine_id, "wf_outcomes", &outcome_rows).await {
+  if let Err(error) = push_rows(
+    &client,
+    &url,
+    &anon_key,
+    &machine_id,
+    "wf_outcomes",
+    "sync_id",
+    &outcome_rows,
+  )
+  .await
+  {
     result.errors.push(format!("wf_outcomes: {error}"));
   } else {
-    mark_synced(&state.pool, "wf_outcomes", &now).await?;
+    let sync_ids = sync_ids_from_rows(&outcome_rows, |row| row.sync_id.as_ref());
+    mark_rows_synced(&state.pool, "wf_outcomes", &sync_ids, &now).await?;
     result.pushed += outcome_rows.len();
   }
 
@@ -340,6 +413,7 @@ pub async fn push_to_supabase(
     &anon_key,
     &machine_id,
     "wf_patient_status_history",
+    "sync_id",
     &history_rows,
   )
   .await
@@ -348,7 +422,8 @@ pub async fn push_to_supabase(
       .errors
       .push(format!("wf_patient_status_history: {error}"));
   } else {
-    mark_synced(&state.pool, "wf_patient_status_history", &now).await?;
+    let sync_ids = sync_ids_from_rows(&history_rows, |row| row.sync_id.as_ref());
+    mark_rows_synced(&state.pool, "wf_patient_status_history", &sync_ids, &now).await?;
     result.pushed += history_rows.len();
   }
 
@@ -378,7 +453,10 @@ pub async fn pull_from_supabase(
   let patient_url = build_rest_url(
     &url,
     "wf_patients",
-    &[("updated_at", format!("gt.{last_pull_at}"))],
+    &[
+      ("updated_at", format!("gt.{last_pull_at}")),
+      ("order", "updated_at.asc,sync_id.asc".to_string()),
+    ],
   )?;
   let patient_rows: Vec<WfPatientSync> = with_auth(client.get(patient_url), &anon_key, &machine_id)
     .send()
@@ -393,7 +471,8 @@ pub async fn pull_from_supabase(
           (sync_id, machine_id, hn, enrolled_at, enrolled_by, status, indication, target_inr_low, \
            target_inr_high, notes, created_at, updated_at, deleted_at, synced_at) \
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(sync_id) DO UPDATE SET \
+       ON CONFLICT(hn) DO UPDATE SET \
+          sync_id = excluded.sync_id, \
           machine_id = excluded.machine_id, \
           hn = excluded.hn, \
           enrolled_at = excluded.enrolled_at, \
@@ -403,10 +482,11 @@ pub async fn pull_from_supabase(
           target_inr_low = excluded.target_inr_low, \
           target_inr_high = excluded.target_inr_high, \
           notes = excluded.notes, \
+           created_at = excluded.created_at, \
           updated_at = excluded.updated_at, \
           deleted_at = excluded.deleted_at, \
           synced_at = excluded.synced_at \
-       WHERE excluded.updated_at > wf_patients.updated_at",
+         WHERE excluded.updated_at >= wf_patients.updated_at",
     )
     .bind(&row.sync_id)
     .bind(&row.machine_id)
@@ -583,13 +663,14 @@ pub async fn pull_from_supabase(
     "wf_appointments",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let appointment_rows: Vec<WfAppointmentSync> = with_auth(client.get(appointment_url), &anon_key, &machine_id)
-    .send()
-    .await
-    .map_err(|e| e.to_string())?
-    .json()
-    .await
-    .map_err(|e| e.to_string())?;
+  let appointment_rows: Vec<WfAppointmentSync> =
+    with_auth(client.get(appointment_url), &anon_key, &machine_id)
+      .send()
+      .await
+      .map_err(|e| e.to_string())?
+      .json()
+      .await
+      .map_err(|e| e.to_string())?;
   for row in &appointment_rows {
     let affected = sqlx::query(
       "INSERT INTO wf_appointments \
@@ -695,13 +776,14 @@ pub async fn pull_from_supabase(
     "wf_patient_status_history",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let history_rows: Vec<WfPatientStatusHistorySync> = with_auth(client.get(history_url), &anon_key, &machine_id)
-    .send()
-    .await
-    .map_err(|e| e.to_string())?
-    .json()
-    .await
-    .map_err(|e| e.to_string())?;
+  let history_rows: Vec<WfPatientStatusHistorySync> =
+    with_auth(client.get(history_url), &anon_key, &machine_id)
+      .send()
+      .await
+      .map_err(|e| e.to_string())?
+      .json()
+      .await
+      .map_err(|e| e.to_string())?;
   for row in &history_rows {
     let affected = sqlx::query(
       "INSERT INTO wf_patient_status_history \
