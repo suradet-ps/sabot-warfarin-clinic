@@ -2,16 +2,18 @@
 import { onMounted, ref, watch } from 'vue'
 import { Plus, Trash2, Search, X, AlertCircle } from 'lucide-vue-next'
 import { useSettingsStore } from '#/stores/settings'
+import SyncPanel from '#/components/settings/SyncPanel.vue'
 
 const store = useSettingsStore()
 const testResult = ref<boolean | null>(null)
 const testing = ref(false)
 
-const activeSection = ref<'connection' | 'hospital' | 'interactions'>('connection')
+const activeSection = ref<'connection' | 'hospital' | 'interactions' | 'sync'>('connection')
 
 const sections = [
   { key: 'connection', label: 'การเชื่อมต่อ' },
   { key: 'hospital', label: 'ข้อมูลโรงพยาบาล' },
+  { key: 'sync', label: 'Cloud Sync' },
   { key: 'interactions', label: 'Drug interaction' },
 ] as const
 
@@ -133,6 +135,10 @@ async function handleDeleteInteraction(id: number) {
         <span class="caption" style="color:var(--color-slate)">ชื่อโรงพยาบาล</span>
         <input class="input" v-model="store.hospitalName" />
       </label>
+    </div>
+
+    <div v-else-if="activeSection === 'sync'" class="settings-section">
+      <SyncPanel />
     </div>
 
     <div v-else-if="activeSection === 'interactions'" class="settings-section">

@@ -1,6 +1,19 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import AppSidebar from '#/components/layout/AppSidebar.vue'
 import AppHeader from '#/components/layout/AppHeader.vue'
+import { useSyncStore } from '#/stores/sync'
+
+const syncStore = useSyncStore()
+
+onMounted(async () => {
+  try {
+    await syncStore.refreshAll()
+  } catch (error) {
+    console.error('Failed to refresh sync status:', error)
+  }
+  syncStore.startAutoSync()
+})
 </script>
 
 <template>

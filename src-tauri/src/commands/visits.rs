@@ -33,7 +33,7 @@ pub async fn get_visit_by_id(visit_id: i64, state: State<'_, AppState>) -> Resul
 
 #[tauri::command]
 pub async fn save_visit(visit: VisitInput, state: State<'_, AppState>) -> Result<i64, String> {
-  db_save(&state.pool, &visit)
+  db_save(&state.pool, &visit, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }
@@ -44,7 +44,7 @@ pub async fn update_visit(
   visit: VisitInput,
   state: State<'_, AppState>,
 ) -> Result<(), String> {
-  db_update_visit(&state.pool, visit_id, &visit)
+  db_update_visit(&state.pool, visit_id, &visit, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }
@@ -66,7 +66,7 @@ pub async fn suggest_dose(
 
 #[tauri::command]
 pub async fn delete_visit(visit_id: i64, state: State<'_, AppState>) -> Result<(), String> {
-  db_delete_visit(&state.pool, visit_id)
+  db_delete_visit(&state.pool, visit_id, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }
@@ -89,7 +89,7 @@ pub async fn approve_visit(
   reviewer: String,
   state: State<'_, AppState>,
 ) -> Result<(), String> {
-  db_approve_visit(&state.pool, visit_id, &reviewer)
+  db_approve_visit(&state.pool, visit_id, &reviewer, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }

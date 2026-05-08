@@ -17,7 +17,9 @@ tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 tauri-plugin-store = "2"
 aes-gcm = "0.10"
+hkdf = "0.12"
 rand = "0.8"
+sha2 = "0.10"
 base64 = "0.22"
 sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio", "chrono", "macros"] }
 tokio = { version = "1", features = ["full"] }
@@ -28,6 +30,8 @@ anyhow = "1"
 thiserror = "2"
 regex = "1"
 tauri-plugin-dialog = "2"
+reqwest = { version = "0.12", features = ["json"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [features]
 default = ["custom-protocol"]

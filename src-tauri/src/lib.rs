@@ -24,6 +24,10 @@ use commands::{
     get_mysql_config_for_ui, get_setting_value, get_settings, save_setting, test_mysql_connection,
   },
   slip::save_slip_pdf,
+  sync::{
+    get_sync_status, get_sync_summary, pull_from_supabase, push_to_supabase, save_supabase_config,
+    test_supabase_connection,
+  },
   visits::{
     approve_visit, delete_visit, get_pending_review_count, get_pending_review_visits,
     get_visit_by_id, get_visit_history, save_visit, suggest_dose, update_visit,
@@ -33,6 +37,9 @@ use db::sqlite::{AppState, init_pool};
 use tauri::{App, Manager};
 
 fn initialise_app_state(app: &mut App) -> Result<()> {
+  let machine_id =
+    commands::sync::get_or_create_machine_id(app.handle()).map_err(anyhow::Error::msg)?;
+
   let app_dir = app
     .path()
     .app_data_dir()
@@ -53,7 +60,7 @@ fn initialise_app_state(app: &mut App) -> Result<()> {
     )
   })?;
 
-  app.manage(AppState::new(pool));
+  app.manage(AppState::new(pool, machine_id));
   Ok(())
 }
 
@@ -100,6 +107,12 @@ pub fn run() -> tauri::Result<()> {
       get_pending_review_visits,
       get_pending_review_count,
       approve_visit,
+      save_supabase_config,
+      test_supabase_connection,
+      push_to_supabase,
+      pull_from_supabase,
+      get_sync_status,
+      get_sync_summary,
     ])
     .run(tauri::generate_context!())
 }

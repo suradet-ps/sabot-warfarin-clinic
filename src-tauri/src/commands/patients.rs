@@ -115,7 +115,7 @@ pub async fn enroll_patient(
   input: EnrollmentInput,
   state: State<'_, AppState>,
 ) -> Result<i64, String> {
-  db_enroll(&state.pool, &input)
+  db_enroll(&state.pool, &input, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }
@@ -194,6 +194,7 @@ pub async fn update_patient_status(
     &status,
     Some(reason.as_str()),
     effective_date.as_deref(),
+    &state.machine_id,
   )
   .await
   .map_err(|e| e.to_string())

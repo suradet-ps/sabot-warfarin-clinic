@@ -66,12 +66,14 @@ body {
 .card-feature-coral { background: var(--color-coral-light); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
 .card-feature-teal { background: var(--color-teal-light); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
 
-.badge { display: inline-flex; align-items: center; font-size: var(--typography-caption-bold-size); font-weight: var(--typography-caption-bold-weight); border-radius: var(--rounded-full); padding: 4px 10px; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; font-size: var(--typography-caption-bold-size); font-weight: var(--typography-caption-bold-weight); border-radius: var(--rounded-full); padding: var(--spacing-xs) var(--spacing-sm); white-space: nowrap; }
 .badge-success { background: var(--color-success-accent); color: var(--color-on-primary); }
 .badge-warning { background: var(--color-coral-light); color: var(--color-coral-dark); }
 .badge-danger { background: var(--color-brand-red); color: var(--color-brand-red-dark); }
 .badge-muted { background: var(--color-surface); color: var(--color-stone); }
 .badge-info { background: var(--color-surface-pricing-featured); color: var(--color-brand-blue); }
+.badge-tag-coral { background: var(--color-brand-coral); color: var(--color-on-primary); }
+.badge-tag-purple { background: var(--color-surface-pricing-featured); color: var(--color-brand-blue); }
 
 .input {
   background: var(--color-canvas);

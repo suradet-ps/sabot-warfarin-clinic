@@ -22,7 +22,7 @@ pub async fn record_adverse_event(
   event: OutcomeInput,
   state: State<'_, AppState>,
 ) -> Result<i64, String> {
-  db_record_outcome(&state.pool, &event)
+  db_record_outcome(&state.pool, &event, &state.machine_id)
     .await
     .map_err(|e| e.to_string())
 }

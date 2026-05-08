@@ -153,24 +153,29 @@ CREATE TABLE wf_patients (
 #### `wf_visits` — Warfarin Clinic Visit Records
 ```sql
 CREATE TABLE wf_visits (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-    hn                  TEXT NOT NULL,
-    visit_date          TEXT NOT NULL,
-    inr_value           REAL,
-    inr_source          TEXT,   -- lab_order | lab_app_order | manual
-    current_dose_mgday  REAL,   -- total mg per day
-    dose_detail         TEXT,   -- JSON: {mon, tue, wed, thu, fri, sat, sun} in mg
-    new_dose_mgday      REAL,   -- prescribed new total mg per day
-    new_dose_detail     TEXT,   -- JSON: new daily schedule
-    dose_changed        INTEGER DEFAULT 0,  -- boolean
-    next_appointment    TEXT,   -- ISO date
-    next_inr_due        TEXT,   -- ISO date
-    physician           TEXT,
-    notes               TEXT,
-    side_effects        TEXT,   -- JSON array
-    adherence           TEXT,   -- good | fair | poor
-    created_by          TEXT,
-    created_at          TEXT NOT NULL
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    hn                      TEXT NOT NULL,
+    visit_date              TEXT NOT NULL,
+    inr_value               REAL,
+    inr_source              TEXT,   -- lab_order | lab_app_order | manual
+    current_dose_mgday      REAL,   -- total mg per day
+    dose_detail             TEXT,   -- JSON: {mon, tue, wed, thu, fri, sat, sun} in mg
+    new_dose_mgday          REAL,   -- prescribed new total mg per day
+    new_dose_detail         TEXT,   -- JSON: new daily schedule
+    new_dose_description    TEXT,   -- from 0003 migration
+    selected_dose_option    TEXT,   -- from 0004 migration
+    dose_changed            INTEGER NOT NULL DEFAULT 0,  -- boolean
+    next_appointment        TEXT,   -- ISO date
+    next_inr_due            TEXT,   -- ISO date
+    physician               TEXT,
+    notes                   TEXT,
+    side_effects            TEXT,   -- JSON array
+    adherence               TEXT,   -- good | fair | poor
+    created_by              TEXT,
+    reviewed_at             TEXT,   -- from 0007 migration
+    reviewed_by             TEXT,   -- from 0007 migration
+    created_at              TEXT NOT NULL,
+    updated_at              TEXT NOT NULL  -- added for sync (CLOUD-SYNC.md)
 );
 ```
 
@@ -194,14 +199,17 @@ CREATE TABLE wf_dose_history (
 #### `wf_appointments` — Appointment Schedule
 ```sql
 CREATE TABLE wf_appointments (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    hn              TEXT NOT NULL,
-    appt_date       TEXT NOT NULL,
-    appt_type       TEXT,   -- inr_check | clinic_visit | urgent
-    status          TEXT NOT NULL DEFAULT 'scheduled',
-                    -- scheduled | completed | missed | cancelled
-    notes           TEXT,
-    created_at      TEXT NOT NULL
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    hn                  TEXT NOT NULL,
+    appt_date           TEXT NOT NULL,
+    appt_type           TEXT,   -- inr_check | clinic_visit | urgent
+    status              TEXT NOT NULL DEFAULT 'scheduled',
+                        -- scheduled | completed | missed | cancelled
+    notes               TEXT,
+    source_visit_id     INTEGER,  -- from 0005 migration
+    generated_from_visit INTEGER NOT NULL DEFAULT 0,  -- from 0005 migration
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL  -- added for sync (CLOUD-SYNC.md)
 );
 ```
 
@@ -218,7 +226,43 @@ CREATE TABLE wf_outcomes (
     inr_at_event    REAL,
     action_taken    TEXT,
     created_by      TEXT,
-    created_at      TEXT NOT NULL
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL  -- added for sync (CLOUD-SYNC.md)
+);
+```
+
+#### `wf_patient_status_history` — Patient Status Change Log (from 0002 migration)
+```sql
+CREATE TABLE wf_patient_status_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    hn              TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    reason          TEXT,
+    effective_date  TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL  -- added for sync (CLOUD-SYNC.md)
+);
+```
+
+#### `wf_settings` — Application Settings (key-value store)
+```sql
+CREATE TABLE wf_settings (
+    key     TEXT PRIMARY KEY,
+    value   TEXT NOT NULL
+);
+```
+
+#### `wf_drug_interactions` — Drug Interaction Rules (from 0006 migration)
+```sql
+CREATE TABLE wf_drug_interactions (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    icode               TEXT NOT NULL,
+    drug_name           TEXT NOT NULL,
+    strength            TEXT,
+    interaction_type    TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
+    UNIQUE(icode)
 );
 ```
 
@@ -428,6 +472,7 @@ CREATE TABLE wf_outcomes (
 - **Default Target INR Ranges**: per indication (AF: 2–3, Mechanical Valve: 2.5–3.5, etc.)
 - **Staff Names**: list for "created by" / "physician" dropdowns
 - **Hospital Name & Logo**: used in printed slips
+- **Cloud Sync (Supabase)**: configure backup/restore, push/pull controls, auto-sync settings (see CLOUD-SYNC.md)
 - **Backup**: export SQLite file
 
 ---
@@ -523,6 +568,28 @@ async fn get_patient_alerts(sqlite: State<SqlitePool>, mysql: State<MySqlPool>) 
 async fn update_patient_status(db: State<SqlitePool>, hn: String, status: String, reason: String) -> Result<()>
 ```
 
+### Cloud Sync Commands (CLOUD-SYNC.md)
+```rust
+#[tauri::command]
+async fn save_supabase_config(app: tauri::AppHandle, url: String, anon_key: String) -> Result<(), String>
+
+#[tauri::command]
+async fn test_supabase_connection(url: String, anon_key: String) -> Result<bool, String>
+
+#[tauri::command]
+async fn push_to_supabase(app: tauri::AppHandle, sqlite: State<SqlitePool>) -> Result<SyncResult, String>
+
+#[tauri::command]
+async fn pull_from_supabase(app: tauri::AppHandle, sqlite: State<SqlitePool>) -> Result<SyncResult, String>
+
+#[tauri::command]
+async fn get_sync_status(app: tauri::AppHandle, sqlite: State<SqlitePool>) -> Result<SyncStatus, String>
+
+#[tauri::command]
+async fn get_sync_summary(app: tauri::AppHandle) -> Result<SyncSummary, String>
+// Returns { has_anon_key: bool, supabase_url: String | null }
+```
+
 ---
 
 ## Dose Suggestion Algorithm (Rust Module)
@@ -575,6 +642,7 @@ pub fn suggest_dose(current_dose: f64, inr: f64, target_low: f64, target_high: f
 | `useVisitStore` | Current visit form state, dose suggestion |
 | `useAlertStore` | Computed alerts, badge counts |
 | `useSettingsStore` | DB config, drug codes, default INR ranges, staff list |
+| `useSyncStore` | Cloud sync status, push/pull to Supabase (CLOUD-SYNC.md) |
 
 ---
 
@@ -629,12 +697,24 @@ Key pointers into `DESIGN.md`:
 ```toml
 [dependencies]
 tauri = { version = "2", features = [] }
-sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio", "chrono"] }
+tauri-plugin-shell = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+aes-gcm = "0.10"
+rand = "0.8"
+base64 = "0.22"
+sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio", "chrono", "macros"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
 anyhow = "1"
+thiserror = "2"
+regex = "1"
+
+# For Cloud Sync (CLOUD-SYNC.md)
+reqwest = { version = "0.12", features = ["json"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 ```
 
 ---
@@ -647,22 +727,28 @@ warfarin-clinic/
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── lib.rs
+│   │   ├── encrypt.rs              # AES-256-GCM encryption for credentials
 │   │   ├── db/
 │   │   │   ├── mod.rs
-│   │   │   ├── mysql.rs          # HosXP queries: screening, dispensing, INR
-│   │   │   └── sqlite.rs         # Migrations, CRUD
+│   │   │   ├── mysql.rs           # HosXP queries: screening, dispensing, INR
+│   │   │   └── sqlite.rs          # Migrations, CRUD
 │   │   ├── commands/
 │   │   │   ├── mod.rs
-│   │   │   ├── screening.rs      # search_warfarin_patients
-│   │   │   ├── patients.rs       # enroll, get_active, update_status
-│   │   │   ├── visits.rs         # save_visit, get_visit_history
-│   │   │   ├── inr.rs            # get_inr_history, get_latest_inr
-│   │   │   ├── appointments.rs   # schedule, update status
-│   │   │   ├── alerts.rs         # get_patient_alerts
-│   │   │   ├── reports.rs        # TTR, census, adverse events
-│   │   │   └── settings.rs       # test_connection, config CRUD
+│   │   │   ├── screening.rs        # search_warfarin_patients
+│   │   │   ├── patients.rs         # enroll, get_active, update_status
+│   │   │   ├── visits.rs           # save_visit, get_visit_history
+│   │   │   ├── inr.rs              # get_inr_history, get_latest_inr
+│   │   │   ├── appointments.rs     # schedule, update status
+│   │   │   ├── alerts.rs           # get_patient_alerts
+│   │   │   ├── reports.rs          # TTR, census, adverse events
+│   │   │   ├── settings.rs         # test_connection, config CRUD
+│   │   │   ├── outcomes.rs         # record_adverse_event
+│   │   │   ├── interaction.rs      # drug interactions CRUD (0006)
+│   │   │   └── slip.rs             # Physician Communication Slip
 │   │   ├── dose/
-│   │   │   └── calculator.rs     # suggest_dose, DoseSuggestion, TTR
+│   │   │   ├── mod.rs
+│   │   │   ├── calculator.rs       # suggest_dose, DoseSuggestion, TTR
+│   │   │   └── usage_parser.rs     # parse dose_detail JSON
 │   │   └── models/
 │   │       ├── mod.rs
 │   │       ├── patient.rs
@@ -670,7 +756,9 @@ warfarin-clinic/
 │   │       ├── visit.rs
 │   │       ├── appointment.rs
 │   │       ├── alert.rs
-│   │       └── dispensing.rs
+│   │       ├── dispensing.rs
+│   │       ├── outcome.rs          # Adverse events model
+│   │       └── interaction.rs      # Drug interaction model
 │   └── Cargo.toml
 ├── src/
 │   ├── main.ts
@@ -681,7 +769,8 @@ warfarin-clinic/
 │   │   ├── screening.ts
 │   │   ├── visit.ts
 │   │   ├── alerts.ts
-│   │   └── settings.ts
+│   │   ├── settings.ts
+│   │   └── sync.ts                 # Cloud sync store (CLOUD-SYNC.md)
 │   ├── views/
 │   │   ├── ScreeningView.vue
 │   │   ├── ActiveView.vue
@@ -714,6 +803,8 @@ warfarin-clinic/
 │   │   │   └── DayDoseTable.vue       # Mon–Sun per-day dose grid
 │   │   ├── slip/
 │   │   │   └── PhysicianSlip.vue      # printable slip component
+│   │   ├── settings/
+│   │   │   └── SyncPanel.vue          # Cloud sync config (CLOUD-SYNC.md)
 │   │   └── shared/
 │   │       ├── StatusBadge.vue
 │   │       ├── ConfirmDialog.vue
@@ -726,7 +817,8 @@ warfarin-clinic/
 │       ├── alert.ts
 │       └── dispensing.ts
 ├── DESIGN.md
-└── agents.md
+├── AGENTS.md
+└── CLOUD-SYNC.md                    # Cloud sync implementation spec
 ```
 
 ---

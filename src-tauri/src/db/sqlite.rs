@@ -7,6 +7,7 @@ use anyhow::{Context, Result, bail};
 use chrono::{Datelike, Utc};
 use sqlx::{Row, Sqlite, SqlitePool, Transaction, sqlite::SqlitePoolOptions};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 use crate::models::{
   appointment::{AppointmentInput, WfAppointment},
@@ -135,6 +136,10 @@ fn selected_option_summary(snapshot: &RegimenOptionSnapshot) -> TotalPillsSummar
   }
 }
 
+fn new_sync_id() -> String {
+  Uuid::new_v4().to_string()
+}
+
 // Pool initialisation
 
 /// Opens (or creates) the SQLite database and runs embedded migrations.
@@ -157,13 +162,17 @@ pub async fn init_pool(db_path: PathBuf) -> Result<SqlitePool> {
 // wf_patients
 
 /// Inserts a new enrolled patient and returns the new row ID.
-pub async fn enroll_patient(pool: &SqlitePool, input: &EnrollmentInput) -> Result<i64> {
+pub async fn enroll_patient(
+  pool: &SqlitePool,
+  input: &EnrollmentInput,
+  machine_id: &str,
+) -> Result<i64> {
   let now = Utc::now().to_rfc3339();
   let id = sqlx::query(
     "INSERT INTO wf_patients \
          (hn, enrolled_at, enrolled_by, status, indication, \
-          target_inr_low, target_inr_high, notes, created_at, updated_at) \
-         VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)",
+          target_inr_low, target_inr_high, notes, created_at, updated_at, sync_id, machine_id) \
+         VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&input.hn)
   .bind(&input.enrolled_at)
@@ -174,6 +183,8 @@ pub async fn enroll_patient(pool: &SqlitePool, input: &EnrollmentInput) -> Resul
   .bind(&input.notes)
   .bind(&now)
   .bind(&now)
+  .bind(new_sync_id())
+  .bind(machine_id)
   .execute(pool)
   .await
   .context("failed to enroll patient")?
@@ -187,7 +198,7 @@ pub async fn get_active_patients(pool: &SqlitePool) -> Result<Vec<WfPatient>> {
   let rows = sqlx::query(
     "SELECT id, hn, enrolled_at, enrolled_by, status, indication, \
          target_inr_low, target_inr_high, notes, created_at, updated_at \
-         FROM wf_patients WHERE status = 'active' ORDER BY enrolled_at DESC",
+      FROM wf_patients WHERE status = 'active' AND deleted_at IS NULL ORDER BY enrolled_at DESC",
   )
   .fetch_all(pool)
   .await
@@ -218,7 +229,7 @@ pub async fn get_all_patients(pool: &SqlitePool) -> Result<Vec<WfPatient>> {
   let rows = sqlx::query(
     "SELECT id, hn, enrolled_at, enrolled_by, status, indication, \
          target_inr_low, target_inr_high, notes, created_at, updated_at \
-         FROM wf_patients ORDER BY enrolled_at DESC",
+      FROM wf_patients WHERE deleted_at IS NULL ORDER BY enrolled_at DESC",
   )
   .fetch_all(pool)
   .await
@@ -249,7 +260,7 @@ pub async fn get_patient_by_hn(pool: &SqlitePool, hn: &str) -> Result<Option<WfP
   let row = sqlx::query(
     "SELECT id, hn, enrolled_at, enrolled_by, status, indication, \
          target_inr_low, target_inr_high, notes, created_at, updated_at \
-         FROM wf_patients WHERE hn = ?",
+      FROM wf_patients WHERE hn = ? AND deleted_at IS NULL",
   )
   .bind(hn)
   .fetch_optional(pool)
@@ -273,7 +284,7 @@ pub async fn get_patient_by_hn(pool: &SqlitePool, hn: &str) -> Result<Option<WfP
 
 /// Returns all enrolled HNs (any status).
 pub async fn get_all_enrolled_hns(pool: &SqlitePool) -> Result<Vec<String>> {
-  let rows = sqlx::query("SELECT hn FROM wf_patients")
+  let rows = sqlx::query("SELECT hn FROM wf_patients WHERE deleted_at IS NULL")
     .fetch_all(pool)
     .await
     .context("failed to query enrolled HNs")?;
@@ -287,6 +298,7 @@ pub async fn update_patient_status(
   status: &str,
   reason: Option<&str>,
   effective_date: Option<&str>,
+  machine_id: &str,
 ) -> Result<()> {
   let now = Utc::now().to_rfc3339();
   let effective_date = effective_date
@@ -304,27 +316,37 @@ pub async fn update_patient_status(
     .await
     .context("failed to begin patient status update transaction")?;
 
-  let result = sqlx::query("UPDATE wf_patients SET status = ?, updated_at = ? WHERE hn = ?")
-    .bind(status)
-    .bind(&now)
-    .bind(hn)
-    .execute(&mut *tx)
-    .await
-    .context("failed to update patient status")?;
+  let result = sqlx::query(
+    "UPDATE wf_patients \
+        SET status = ?, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+      WHERE hn = ? AND deleted_at IS NULL",
+  )
+  .bind(status)
+  .bind(&now)
+  .bind(machine_id)
+  .bind(new_sync_id())
+  .bind(hn)
+  .execute(&mut *tx)
+  .await
+  .context("failed to update patient status")?;
 
   if result.rows_affected() == 0 {
     bail!("patient not found: {hn}");
   }
 
   sqlx::query(
-    "INSERT INTO wf_patient_status_history (hn, status, reason, effective_date, created_at) \
-         VALUES (?, ?, ?, ?, ?)",
+    "INSERT INTO wf_patient_status_history \
+        (hn, status, reason, effective_date, created_at, updated_at, sync_id, machine_id) \
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(hn)
   .bind(status)
   .bind(reason)
   .bind(&effective_date)
   .bind(&now)
+  .bind(&now)
+  .bind(new_sync_id())
+  .bind(machine_id)
   .execute(&mut *tx)
   .await
   .context("failed to record patient status history")?;
@@ -339,7 +361,7 @@ pub async fn update_patient_status(
 // wf_visits
 
 /// Inserts a visit record and returns the new row ID.
-pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
+pub async fn save_visit(pool: &SqlitePool, input: &VisitInput, machine_id: &str) -> Result<i64> {
   let now = Utc::now().to_rfc3339();
   let dose_detail_json = input
     .dose_detail
@@ -370,8 +392,8 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
          (hn, visit_date, inr_value, inr_source, \
            current_dose_mgday, dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
            dose_changed, next_appointment, next_inr_due, \
-           physician, notes, side_effects, adherence, created_by, created_at) \
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+           physician, notes, side_effects, adherence, created_by, created_at, updated_at, sync_id, machine_id) \
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&input.hn)
   .bind(&input.visit_date)
@@ -392,12 +414,15 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
   .bind(&input.adherence)
   .bind(&input.created_by)
   .bind(&now)
+  .bind(&now)
+  .bind(new_sync_id())
+  .bind(machine_id)
   .execute(&mut *tx)
   .await
   .context("failed to save visit")?
   .last_insert_rowid();
 
-  sync_visit_appointment(&mut tx, input, id, &now).await?;
+  sync_visit_appointment(&mut tx, input, id, &now, machine_id).await?;
 
   tx.commit()
     .await
@@ -407,7 +432,13 @@ pub async fn save_visit(pool: &SqlitePool, input: &VisitInput) -> Result<i64> {
 }
 
 /// Updates an existing visit record. Returns error if visit not found.
-pub async fn update_visit(pool: &SqlitePool, visit_id: i64, input: &VisitInput) -> Result<()> {
+pub async fn update_visit(
+  pool: &SqlitePool,
+  visit_id: i64,
+  input: &VisitInput,
+  machine_id: &str,
+) -> Result<()> {
+  let now = Utc::now().to_rfc3339();
   let dose_detail_json = input
     .dose_detail
     .as_ref()
@@ -437,8 +468,9 @@ pub async fn update_visit(pool: &SqlitePool, visit_id: i64, input: &VisitInput) 
         visit_date = ?, inr_value = ?, inr_source = ?, \
         current_dose_mgday = ?, dose_detail = ?, new_dose_mgday = ?, new_dose_detail = ?, new_dose_description = ?, selected_dose_option = ?, \
         dose_changed = ?, next_appointment = ?, next_inr_due = ?, \
-        physician = ?, notes = ?, side_effects = ?, adherence = ? \
-        WHERE id = ?",
+      physician = ?, notes = ?, side_effects = ?, adherence = ?, \
+      updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+      WHERE id = ? AND deleted_at IS NULL",
   )
   .bind(&input.visit_date)
   .bind(input.inr_value)
@@ -456,6 +488,9 @@ pub async fn update_visit(pool: &SqlitePool, visit_id: i64, input: &VisitInput) 
   .bind(&input.notes)
   .bind(&side_effects_json)
   .bind(&input.adherence)
+  .bind(&now)
+  .bind(machine_id)
+  .bind(new_sync_id())
   .bind(visit_id)
   .execute(&mut *tx)
   .await
@@ -465,8 +500,8 @@ pub async fn update_visit(pool: &SqlitePool, visit_id: i64, input: &VisitInput) 
     bail!("visit not found: {visit_id}");
   }
 
-  unlink_or_delete_visit_appointment(&mut tx, visit_id).await?;
-  sync_visit_appointment(&mut tx, input, visit_id, &Utc::now().to_rfc3339()).await?;
+  unlink_or_delete_visit_appointment(&mut tx, visit_id, &now, machine_id).await?;
+  sync_visit_appointment(&mut tx, input, visit_id, &now, machine_id).await?;
 
   tx.commit()
     .await
@@ -483,7 +518,7 @@ pub async fn get_visit_history(pool: &SqlitePool, hn: &str) -> Result<Vec<WfVisi
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at, \
          reviewed_at, reviewed_by \
-         FROM wf_visits WHERE hn = ? ORDER BY visit_date DESC",
+      FROM wf_visits WHERE hn = ? AND deleted_at IS NULL ORDER BY visit_date DESC",
   )
   .bind(hn)
   .fetch_all(pool)
@@ -564,7 +599,7 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at, \
          reviewed_at, reviewed_by \
-         FROM wf_visits WHERE id = ?",
+      FROM wf_visits WHERE id = ? AND deleted_at IS NULL",
   )
   .bind(visit_id)
   .fetch_optional(pool)
@@ -643,7 +678,7 @@ pub async fn get_visit_by_id(pool: &SqlitePool, visit_id: i64) -> Result<Option<
 pub async fn get_inr_from_visits(pool: &SqlitePool, hn: &str) -> Result<Vec<InrRecord>> {
   let rows = sqlx::query(
     "SELECT visit_date, inr_value, inr_source FROM wf_visits \
-         WHERE hn = ? AND inr_value IS NOT NULL ORDER BY visit_date ASC",
+      WHERE hn = ? AND deleted_at IS NULL AND inr_value IS NOT NULL ORDER BY visit_date ASC",
   )
   .bind(hn)
   .fetch_all(pool)
@@ -672,19 +707,32 @@ pub async fn get_inr_from_visits(pool: &SqlitePool, hn: &str) -> Result<Vec<InrR
 }
 
 /// Deletes a visit record by ID.
-pub async fn delete_visit(pool: &SqlitePool, visit_id: i64) -> Result<()> {
+pub async fn delete_visit(pool: &SqlitePool, visit_id: i64, machine_id: &str) -> Result<()> {
+  let now = Utc::now().to_rfc3339();
   let mut tx = pool
     .begin()
     .await
     .context("failed to begin visit delete transaction")?;
 
-  unlink_or_delete_visit_appointment(&mut tx, visit_id).await?;
+  unlink_or_delete_visit_appointment(&mut tx, visit_id, &now, machine_id).await?;
 
-  sqlx::query("DELETE FROM wf_visits WHERE id = ?")
-    .bind(visit_id)
-    .execute(&mut *tx)
-    .await
-    .context("failed to delete visit")?;
+  let result = sqlx::query(
+    "UPDATE wf_visits \
+        SET deleted_at = ?, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+      WHERE id = ? AND deleted_at IS NULL",
+  )
+  .bind(&now)
+  .bind(&now)
+  .bind(machine_id)
+  .bind(new_sync_id())
+  .bind(visit_id)
+  .execute(&mut *tx)
+  .await
+  .context("failed to delete visit")?;
+
+  if result.rows_affected() == 0 {
+    bail!("visit not found: {visit_id}");
+  }
 
   tx.commit()
     .await
@@ -698,6 +746,7 @@ async fn sync_visit_appointment(
   input: &VisitInput,
   visit_id: i64,
   now: &str,
+  machine_id: &str,
 ) -> Result<()> {
   let Some(next_appointment) = input
     .next_appointment
@@ -710,7 +759,7 @@ async fn sync_visit_appointment(
 
   let existing_manual_appointment_id = sqlx::query_scalar::<_, i64>(
     "SELECT id FROM wf_appointments \
-         WHERE hn = ? AND appt_date = ? AND status = 'scheduled' AND source_visit_id IS NULL \
+      WHERE hn = ? AND appt_date = ? AND status = 'scheduled' AND source_visit_id IS NULL AND deleted_at IS NULL \
          ORDER BY id DESC LIMIT 1",
   )
   .bind(&input.hn)
@@ -723,10 +772,16 @@ async fn sync_visit_appointment(
     sqlx::query(
       "UPDATE wf_appointments \
            SET source_visit_id = ?, \
-               appt_type = COALESCE(appt_type, 'clinic_visit') \
-           WHERE id = ?",
+           appt_type = COALESCE(appt_type, 'clinic_visit'), \
+           updated_at = ?, \
+           machine_id = ?, \
+           sync_id = COALESCE(sync_id, ?) \
+         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(visit_id)
+    .bind(now)
+    .bind(machine_id)
+    .bind(new_sync_id())
     .bind(appointment_id)
     .execute(&mut **tx)
     .await
@@ -734,13 +789,16 @@ async fn sync_visit_appointment(
   } else {
     sqlx::query(
       "INSERT INTO wf_appointments \
-           (hn, appt_date, appt_type, status, notes, created_at, source_visit_id, generated_from_visit) \
-           VALUES (?, ?, 'clinic_visit', 'scheduled', NULL, ?, ?, 1)",
+          (hn, appt_date, appt_type, status, notes, created_at, updated_at, source_visit_id, generated_from_visit, sync_id, machine_id) \
+          VALUES (?, ?, 'clinic_visit', 'scheduled', NULL, ?, ?, ?, 1, ?, ?)",
     )
     .bind(&input.hn)
     .bind(next_appointment)
     .bind(now)
+        .bind(now)
     .bind(visit_id)
+        .bind(new_sync_id())
+        .bind(machine_id)
     .execute(&mut **tx)
     .await
     .context("failed to create linked appointment for visit")?;
@@ -752,9 +810,11 @@ async fn sync_visit_appointment(
 async fn unlink_or_delete_visit_appointment(
   tx: &mut Transaction<'_, Sqlite>,
   visit_id: i64,
+  now: &str,
+  machine_id: &str,
 ) -> Result<()> {
   let linked_appointment = sqlx::query(
-    "SELECT id, generated_from_visit FROM wf_appointments WHERE source_visit_id = ? LIMIT 1",
+    "SELECT id, generated_from_visit FROM wf_appointments WHERE source_visit_id = ? AND deleted_at IS NULL LIMIT 1",
   )
   .bind(visit_id)
   .fetch_optional(&mut **tx)
@@ -769,13 +829,28 @@ async fn unlink_or_delete_visit_appointment(
   let generated_from_visit: i32 = appointment.try_get("generated_from_visit").unwrap_or(0);
 
   if generated_from_visit != 0 {
-    sqlx::query("DELETE FROM wf_appointments WHERE id = ?")
-      .bind(appointment_id)
-      .execute(&mut **tx)
-      .await
-      .context("failed to delete auto-generated appointment for visit")?;
+    sqlx::query(
+      "UPDATE wf_appointments \
+          SET deleted_at = ?, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+        WHERE id = ? AND deleted_at IS NULL",
+    )
+    .bind(now)
+    .bind(now)
+    .bind(machine_id)
+    .bind(new_sync_id())
+    .bind(appointment_id)
+    .execute(&mut **tx)
+    .await
+    .context("failed to delete auto-generated appointment for visit")?;
   } else {
-    sqlx::query("UPDATE wf_appointments SET source_visit_id = NULL WHERE id = ?")
+    sqlx::query(
+      "UPDATE wf_appointments \
+          SET source_visit_id = NULL, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+        WHERE id = ? AND deleted_at IS NULL",
+    )
+      .bind(now)
+      .bind(machine_id)
+      .bind(new_sync_id())
       .bind(appointment_id)
       .execute(&mut **tx)
       .await
@@ -788,17 +863,25 @@ async fn unlink_or_delete_visit_appointment(
 // wf_appointments
 
 /// Inserts a new appointment and returns the new row ID.
-pub async fn schedule_appointment(pool: &SqlitePool, input: &AppointmentInput) -> Result<i64> {
+pub async fn schedule_appointment(
+  pool: &SqlitePool,
+  input: &AppointmentInput,
+  machine_id: &str,
+) -> Result<i64> {
   let now = Utc::now().to_rfc3339();
   let id = sqlx::query(
-    "INSERT INTO wf_appointments (hn, appt_date, appt_type, status, notes, created_at) \
-         VALUES (?, ?, ?, 'scheduled', ?, ?)",
+    "INSERT INTO wf_appointments \
+         (hn, appt_date, appt_type, status, notes, created_at, updated_at, sync_id, machine_id) \
+         VALUES (?, ?, ?, 'scheduled', ?, ?, ?, ?, ?)",
   )
   .bind(&input.hn)
   .bind(&input.appt_date)
   .bind(&input.appt_type)
   .bind(&input.notes)
   .bind(&now)
+  .bind(&now)
+  .bind(new_sync_id())
+  .bind(machine_id)
   .execute(pool)
   .await
   .context("failed to schedule appointment")?
@@ -811,7 +894,7 @@ pub async fn schedule_appointment(pool: &SqlitePool, input: &AppointmentInput) -
 pub async fn get_appointments(pool: &SqlitePool, hn: &str) -> Result<Vec<WfAppointment>> {
   let rows = sqlx::query(
     "SELECT id, hn, appt_date, appt_type, status, notes, created_at \
-         FROM wf_appointments WHERE hn = ? ORDER BY appt_date ASC",
+      FROM wf_appointments WHERE hn = ? AND deleted_at IS NULL ORDER BY appt_date ASC",
   )
   .bind(hn)
   .fetch_all(pool)
@@ -838,7 +921,7 @@ pub async fn get_appointments(pool: &SqlitePool, hn: &str) -> Result<Vec<WfAppoi
 pub async fn get_pending_appointments(pool: &SqlitePool) -> Result<Vec<WfAppointment>> {
   let rows = sqlx::query(
     "SELECT id, hn, appt_date, appt_type, status, notes, created_at \
-         FROM wf_appointments WHERE status = 'scheduled' ORDER BY appt_date ASC",
+      FROM wf_appointments WHERE status = 'scheduled' AND deleted_at IS NULL ORDER BY appt_date ASC",
   )
   .fetch_all(pool)
   .await
@@ -862,12 +945,16 @@ pub async fn get_pending_appointments(pool: &SqlitePool) -> Result<Vec<WfAppoint
 
 // wf_outcomes
 
-pub async fn record_adverse_event(pool: &SqlitePool, input: &OutcomeInput) -> Result<i64> {
+pub async fn record_adverse_event(
+  pool: &SqlitePool,
+  input: &OutcomeInput,
+  machine_id: &str,
+) -> Result<i64> {
   let now = Utc::now().to_rfc3339();
   let id = sqlx::query(
     "INSERT INTO wf_outcomes \
-         (hn, event_date, event_type, description, inr_at_event, action_taken, created_by, created_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+         (hn, event_date, event_type, description, inr_at_event, action_taken, created_by, created_at, updated_at, sync_id, machine_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
   .bind(&input.hn)
   .bind(&input.event_date)
@@ -877,6 +964,9 @@ pub async fn record_adverse_event(pool: &SqlitePool, input: &OutcomeInput) -> Re
   .bind(&input.action_taken)
   .bind(&input.created_by)
   .bind(&now)
+  .bind(&now)
+  .bind(new_sync_id())
+  .bind(machine_id)
   .execute(pool)
   .await
   .context("failed to record adverse event")?
@@ -888,7 +978,7 @@ pub async fn record_adverse_event(pool: &SqlitePool, input: &OutcomeInput) -> Re
 pub async fn get_outcomes(pool: &SqlitePool, hn: &str) -> Result<Vec<WfOutcome>> {
   let rows = sqlx::query(
     "SELECT id, hn, event_date, event_type, description, inr_at_event, action_taken, created_by, created_at \
-         FROM wf_outcomes WHERE hn = ? ORDER BY event_date DESC, id DESC",
+      FROM wf_outcomes WHERE hn = ? AND deleted_at IS NULL ORDER BY event_date DESC, id DESC",
   )
   .bind(hn)
   .fetch_all(pool)
@@ -1035,7 +1125,7 @@ pub async fn get_pending_review_visits(pool: &SqlitePool) -> Result<Vec<WfVisit>
          dose_changed, next_appointment, next_inr_due, \
          physician, notes, side_effects, adherence, created_by, created_at, \
          reviewed_at, reviewed_by \
-         FROM wf_visits WHERE reviewed_at IS NULL ORDER BY visit_date DESC",
+      FROM wf_visits WHERE reviewed_at IS NULL AND deleted_at IS NULL ORDER BY visit_date DESC",
   )
   .fetch_all(pool)
   .await
@@ -1110,19 +1200,33 @@ pub async fn get_pending_review_visits(pool: &SqlitePool) -> Result<Vec<WfVisit>
 
 /// Returns count of visits pending review.
 pub async fn get_pending_review_count(pool: &SqlitePool) -> Result<i64> {
-  let row = sqlx::query("SELECT COUNT(*) as cnt FROM wf_visits WHERE reviewed_at IS NULL")
-    .fetch_one(pool)
-    .await
-    .context("failed to count pending reviews")?;
+  let row = sqlx::query(
+    "SELECT COUNT(*) as cnt FROM wf_visits WHERE reviewed_at IS NULL AND deleted_at IS NULL",
+  )
+  .fetch_one(pool)
+  .await
+  .context("failed to count pending reviews")?;
   Ok(row.get("cnt"))
 }
 
 /// Approves a visit (sets reviewed_at and reviewed_by).
-pub async fn approve_visit(pool: &SqlitePool, visit_id: i64, reviewer: &str) -> Result<()> {
+pub async fn approve_visit(
+  pool: &SqlitePool,
+  visit_id: i64,
+  reviewer: &str,
+  machine_id: &str,
+) -> Result<()> {
   let now = Utc::now().to_rfc3339();
-  let result = sqlx::query("UPDATE wf_visits SET reviewed_at = ?, reviewed_by = ? WHERE id = ?")
+  let result = sqlx::query(
+    "UPDATE wf_visits \
+        SET reviewed_at = ?, reviewed_by = ?, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+      WHERE id = ? AND deleted_at IS NULL",
+  )
     .bind(&now)
     .bind(reviewer)
+    .bind(&now)
+    .bind(machine_id)
+    .bind(new_sync_id())
     .bind(visit_id)
     .execute(pool)
     .await
@@ -1144,11 +1248,13 @@ pub async fn approve_visit(pool: &SqlitePool, visit_id: i64, reviewer: &str) -> 
 pub struct AppState {
   /// SQLite connection pool.
   pub pool: SqlitePool,
+  /// Stable identifier for the current machine, used for sync metadata.
+  pub machine_id: String,
 }
 
 impl AppState {
   /// Constructs `AppState` from an already-initialised pool.
-  pub fn new(pool: SqlitePool) -> Self {
-    Self { pool }
+  pub fn new(pool: SqlitePool, machine_id: String) -> Self {
+    Self { pool, machine_id }
   }
 }
