@@ -19,8 +19,8 @@ const hideSplash = () => {
 }
 
 onMounted(async () => {
-  // Hide splash after minimum 2.8s for smooth UX
-  setTimeout(hideSplash, 2800)
+  // Minimum splash display time (1.2s) for visual smoothness
+  setTimeout(hideSplash, 1200)
 
   try {
     await syncStore.refreshAll()
