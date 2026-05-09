@@ -1,4 +1,4 @@
-# Warfarin Clinic Design System — v1.2
+# Warfarin Clinic Design System — v2.0
 
 ## Overview
 
