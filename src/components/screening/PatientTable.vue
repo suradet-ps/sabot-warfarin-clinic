@@ -79,7 +79,7 @@ function goToPage(page: number) {
             <span v-else class="badge badge-muted">ยังไม่ลงทะเบียน</span>
           </td>
           <td>
-            <button v-if="!r.isEnrolled" class="btn btn-primary" style="padding: 6px 16px; font-size: 12px" @click="emit('enroll', r.hn)">นำเข้าคลินิก</button>
+            <button v-if="!r.isEnrolled" class="btn btn-primary" style="padding: 6px 16px; font-size: var(--typography-micro-size)" @click="emit('enroll', r.hn)">นำเข้าคลินิก</button>
           </td>
         </tr>
       </tbody>

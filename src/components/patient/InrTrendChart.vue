@@ -277,6 +277,6 @@ const xTicks = computed(() => {
 .x-axis text,
 .y-axis text {
   fill: var(--color-slate);
-  font-size: 12px;
+  font-size: var(--typography-micro-size);
 }
 </style>

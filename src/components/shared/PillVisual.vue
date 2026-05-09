@@ -33,7 +33,7 @@ defineProps<{
 }
 
 .pill-text {
-  font-size: 10px;
+  font-size: var(--typography-micro-uppercase-size);
   font-weight: 600;
   color: var(--color-on-primary);
 }

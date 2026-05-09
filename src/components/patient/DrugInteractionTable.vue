@@ -148,24 +148,24 @@ onMounted(() => { void loadInteractions() })
 .comparison-table { width: 100%; border-collapse: collapse; }
 .comparison-row { border-bottom: 1px solid var(--color-hairline-soft); }
 .comparison-row th { 
-  padding: var(--spacing-sm) var(--spacing-md); 
-  text-align: left; 
-  font-weight: 600; 
-  font-size: 0.75rem; 
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--typography-micro-uppercase-size);
   color: var(--color-slate);
-  background: var(--color-surface-raised);
+  background: var(--color-surface);
 }
 .comparison-row td { padding: var(--spacing-sm) var(--spacing-md); }
 .text-right { text-align: right; }
 .drug-info { display: flex; flex-direction: column; gap: 2px; }
 .drug-name { font-weight: 500; }
-.drug-strength { font-size: 0.75rem; color: var(--color-slate); }
+.drug-strength { font-size: var(--typography-micro-size); color: var(--color-slate); }
 .summary-card { padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-md); }
 .summary-header { display: flex; align-items: center; gap: var(--spacing-sm); }
 .summary-stats { display: flex; gap: var(--spacing-xl); align-items: center; }
 .stat-item { display: flex; align-items: center; gap: var(--spacing-xs); }
-.stat-value { font-size: 1.5rem; font-weight: 700; }
-.stat-label { font-size: 0.875rem; color: var(--color-slate); }
+.stat-value { font-size: var(--typography-heading-4-size); font-weight: 700; }
+.stat-label { font-size: var(--typography-body-sm-size); color: var(--color-slate); }
 .stat-icon.increase { color: var(--color-inr-high-bg); }
 .stat-icon.decrease { color: var(--color-coral-500); }
 .stat-trend { margin-left: auto; }

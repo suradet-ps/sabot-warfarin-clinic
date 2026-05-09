@@ -224,7 +224,7 @@ onMounted(() => { void loadPatient() })
   border-radius: var(--rounded-full);
   border: 1px solid var(--color-hairline);
   background: transparent;
-  cursor: pointer; font-size: 0.875rem; color: var(--color-slate);
+  cursor: pointer; font-size: var(--typography-body-sm-size); color: var(--color-slate);
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .tab-pill:hover { background: var(--color-surface-raised); }

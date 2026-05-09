@@ -263,41 +263,36 @@ async function handleDeleteInteraction(id: number) {
 .settings-view { display: flex; flex-direction: column; gap: var(--spacing-lg); max-width: 800px; }
 .section-tabs { display: flex; gap: var(--spacing-xs); border-bottom: 1px solid var(--color-hairline); padding-bottom: var(--spacing-xs); }
 .section-tab {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border-radius: var(--rounded-full);
-  background: transparent;
-  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
   cursor: pointer;
-  font-size: 0.875rem;
+  border: none;
+  background: none;
+  font-size: var(--typography-body-sm-size);
   color: var(--color-slate);
-  transition: background 0.15s, color 0.15s;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms;
 }
-.section-tab:hover { background: var(--color-surface-raised); }
+.section-tab:hover { background: var(--color-surface-soft); }
 .section-tab.active { background: var(--color-primary); color: var(--color-on-primary); }
+
+.settings-section { font-size: var(--typography-body-sm-size); }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); margin-bottom: var(--spacing-xl); }
 .form-field { display: flex; flex-direction: column; gap: var(--spacing-xs); }
 .settings-actions { display: flex; align-items: center; gap: var(--spacing-md); }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-lg); }
-.table-card { overflow-x: auto; }
+.table-card { border: 1px solid var(--color-hairline); border-radius: var(--rounded-lg); overflow: hidden; }
 .comparison-table { width: 100%; border-collapse: collapse; }
-.comparison-row { border-bottom: 1px solid var(--color-hairline-soft); }
-.comparison-row th { padding: var(--spacing-sm) var(--spacing-md); text-align: left; font-weight: 600; font-size: 0.75rem; color: var(--color-slate); background: var(--color-surface-raised); }
-.comparison-row td { padding: var(--spacing-sm) var(--spacing-md); }
-.font-mono { font-family: monospace; }
-.text-right { text-align: right; }
-.btn-icon { padding: var(--spacing-xs); }
-.search-input-group { display: flex; gap: var(--spacing-sm); }
+.font-mono { font-family: monospace; font-size: var(--typography-micro-size); }
+.search-input-group { display: flex; gap: var(--spacing-xs); }
 .search-input-group .input { flex: 1; }
 .search-results { display: flex; flex-direction: column; gap: var(--spacing-xs); max-height: 200px; overflow-y: auto; margin-top: var(--spacing-sm); }
-.search-result-item { display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--color-hairline); border-radius: var(--rounded-md); cursor: pointer; text-align: left; background: var(--color-surface); transition: background 0.15s; }
-.search-result-item:hover { background: var(--color-surface-raised); }
-.search-result-item .drug-name { flex: 1; font-weight: 500; }
-.search-result-item .drug-strength { color: var(--color-slate); font-size: 0.75rem; }
-.search-result-item .drug-code { font-family: monospace; font-size: 0.75rem; color: var(--color-slate); }
-.selected-drug { margin-top: var(--spacing-lg); padding: var(--spacing-md); background: var(--color-surface-raised); border-radius: var(--rounded-lg); }
+.search-result-item { display: flex; align-items: center; gap: var(--spacing-md); padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--color-hairline); border-radius: var(--rounded-md); cursor: pointer; text-align: left; background: var(--color-surface); transition: background 150ms; }
+.search-result-item:hover { background: var(--color-surface-soft); }
+.selected-drug { margin-top: var(--spacing-md); padding: var(--spacing-md); background: var(--color-surface); border-radius: var(--rounded-md); }
 .selected-drug-info { display: flex; flex-direction: column; gap: 2px; margin-bottom: var(--spacing-md); }
-.selected-drug-info .drug-name { font-weight: 600; font-size: 1.125rem; }
-.selected-drug-info .drug-code { font-family: monospace; font-size: 0.75rem; color: var(--color-slate); }
+.comparison-row th { padding: var(--spacing-sm) var(--spacing-md); text-align: left; font-weight: 600; font-size: var(--typography-micro-uppercase-size); color: var(--color-slate); background: var(--color-surface); }
+.text-right { text-align: right; }
+.btn-icon { padding: var(--spacing-xs); }
 </style>
 
 <style>
