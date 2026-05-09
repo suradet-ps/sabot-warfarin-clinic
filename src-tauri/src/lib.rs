@@ -20,9 +20,7 @@ use commands::{
   },
   reports::{calculate_clinic_ttr, calculate_ttr, get_report_data},
   screening::search_warfarin_patients,
-  settings::{
-    get_mysql_config_for_ui, get_setting_value, get_settings, save_setting, test_mysql_connection,
-  },
+  settings::{get_mysql_config_for_ui, get_mysql_config_internal, get_setting_value, get_settings, save_setting, test_mysql_connection},
   slip::save_slip_pdf,
   sync::{
     get_sync_status, get_sync_summary, pull_from_supabase, push_to_supabase, save_supabase_config,
@@ -34,13 +32,15 @@ use commands::{
   },
 };
 use db::sqlite::{AppState, init_pool};
-use tauri::{App, Manager};
+use sqlx::mysql::MySqlPoolOptions;
+use tauri::{App, Emitter, Manager};
 
 fn initialise_app_state(app: &mut App) -> Result<()> {
+  let app_handle = app.handle().clone();
   let machine_id =
-    commands::sync::get_or_create_machine_id(app.handle()).map_err(anyhow::Error::msg)?;
+    commands::sync::get_or_create_machine_id(&app_handle).map_err(anyhow::Error::msg)?;
 
-  let app_dir = app
+  let app_dir = app_handle
     .path()
     .app_data_dir()
     .context("failed to resolve app data directory")?;
@@ -60,7 +60,58 @@ fn initialise_app_state(app: &mut App) -> Result<()> {
     )
   })?;
 
-  app.manage(AppState::new(pool, machine_id));
+  app_handle.manage(AppState::new(pool.clone(), machine_id));
+
+  let app_handle_clone = app_handle.clone();
+  let pool_clone = pool.clone();
+  tauri::async_runtime::spawn(async move {
+    let _ = app_handle_clone.emit("splash-status", "กำลังโหลดฐานข้อมูล...");
+
+    match get_mysql_config_internal(&pool_clone).await {
+      Ok(Some(config)) => {
+        let _ = app_handle_clone.emit("splash-status", "กำลังเชื่อมต่อ MySQL...");
+
+        let url = format!(
+          "mysql://{}:{}@{}:{}/{}",
+          config.username, config.password, config.host, config.port, config.database
+        );
+
+        let pool_result = tokio::time::timeout(
+          std::time::Duration::from_secs(8),
+          MySqlPoolOptions::new().max_connections(5).connect(&url),
+        )
+        .await;
+
+        match pool_result {
+          Ok(Ok(_pool)) => {
+            println!(
+              "[warfarin] Auto-connected to MySQL ({}:{})",
+              config.host, config.port
+            );
+            let _ = app_handle_clone.emit("splash-status", "เชื่อมต่อสำเร็จ ✓");
+          }
+          Ok(Err(e)) => {
+            eprintln!("[warfarin] Auto-connect to MySQL failed: {}", e);
+            let _ = app_handle_clone.emit("splash-status", "เชื่อมต่อล้มเหลว (ใช้งานออฟไลน์ได้)");
+          }
+          Err(_) => {
+            eprintln!("[warfarin] MySQL auto-connect timed out after 8 s");
+            let _ = app_handle_clone.emit("splash-status", "เชื่อมต่อหมดเวลา (ใช้งานออฟไลน์ได้)");
+          }
+        }
+      }
+      Ok(None) => {
+        let _ = app_handle_clone.emit("splash-status", "พร้อมใช้งาน (ยังไม่ตั้งค่า MySQL)");
+      }
+      Err(e) => {
+        eprintln!("[warfarin] Failed to load saved DB config: {}", e);
+        let _ = app_handle_clone.emit("splash-status", "โหลดการตั้งค่าล้มเหลว");
+      }
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+  });
+
   Ok(())
 }
 

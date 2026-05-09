@@ -5,9 +5,232 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>คลินิกวาร์ฟาริน — โรงพยาบาลสระโบสถ์</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Roobert:wght@400;500;600;700&display=swap');
+
+      *,
+      *::before,
+      *::after {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+        font-family: 'Roobert', -apple-system, system-ui, 'Segoe UI', Helvetica, Arial, sans-serif;
+        background: #f6f5f4;
+        color: rgba(0, 0, 0, 0.95);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      #app {
+        height: 100%;
+        width: 100%;
+      }
+
+      /* Splash overlay */
+      #splash-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: #f6f5f4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Roobert', -apple-system, system-ui, 'Segoe UI', Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+      }
+
+      #splash-overlay.splash-fade-out {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .splash-card {
+        background: #ffffff;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 16px;
+        box-shadow:
+          rgba(0, 0, 0, 0.06) 0px 8px 32px,
+          rgba(0, 0, 0, 0.04) 0px 4px 18px,
+          rgba(0, 0, 0, 0.027) 0px 2px 8px,
+          rgba(0, 0, 0, 0.015) 0px 1px 3px;
+        padding: 36px 48px 32px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+        width: 320px;
+        position: relative;
+        overflow: hidden;
+        animation: cardIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      .splash-icon-wrap {
+        width: 68px;
+        height: 68px;
+        border-radius: 18px;
+        background: #fdf2f8;
+        border: 1px solid rgba(236, 72, 153, 0.2);
+        box-shadow:
+          rgba(236, 72, 153, 0.15) 0px 2px 8px,
+          rgba(236, 72, 153, 0.1) 0px 1px 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .splash-icon-wrap svg {
+        width: 40px;
+        height: 40px;
+      }
+
+      .splash-text-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+        text-align: center;
+      }
+
+      .splash-app-name {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: rgba(0, 0, 0, 0.95);
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      .splash-app-subtitle {
+        font-size: 11.5px;
+        color: #a39e98;
+        line-height: 1.55;
+        margin: 0;
+      }
+
+      .splash-loading-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .splash-dots {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .splash-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #d93535;
+        opacity: 0.25;
+        animation: splashPulse 1.2s ease-in-out infinite;
+      }
+
+      .splash-dot:nth-child(2) { animation-delay: 0.2s; }
+      .splash-dot:nth-child(3) { animation-delay: 0.4s; }
+
+      @keyframes splashPulse {
+        0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+        40%            { opacity: 1;    transform: scale(1.1);  }
+      }
+
+      .splash-loading-label {
+        font-size: 11px;
+        color: #a39e98;
+        letter-spacing: 0.01em;
+        min-height: 16px;
+        margin: 0;
+      }
+
+      .splash-version {
+        position: absolute;
+        bottom: 14px;
+        font-size: 10px;
+        color: #a39e98;
+        opacity: 0.45;
+      }
+
+      @keyframes cardIn {
+        from { opacity: 0; transform: translateY(8px) scale(0.97); }
+        to   { opacity: 1; transform: translateY(0)   scale(1);    }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash-overlay">
+      <div class="splash-card">
+        <div class="splash-icon-wrap">
+          <svg width="46" height="46" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Warfarin Clinic">
+            <defs>
+              <filter id="shadow_bold" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#831843" flood-opacity="0.25"/>
+              </filter>
+            </defs>
+            <g filter="url(#shadow_bold)" stroke="#EC4899" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M100 185C100 185 185 130 185 80C185 45 155 25 125 25C108 25 100 38 100 38C100 38 92 25 75 25C45 25 15 45 15 80C15 130 100 185 100 185Z"/>
+              <path d="M100 160C100 160 160 115 160 80C160 55 142 42 125 42C112 42 100 50 100 50C100 50 88 42 75 42C58 42 40 55 40 80C40 115 100 160 100 160Z" opacity="0.6"/>
+              <path d="M100 135C100 135 135 105 135 80C135 68 128 60 120 60C110 60 100 68 100 68C100 68 90 60 80 60C72 60 65 68 65 80C65 105 100 135 100 135Z" opacity="0.3"/>
+            </g>
+          </svg>
+        </div>
+        <div class="splash-text-group">
+          <p class="splash-app-name">คลินิกวาร์ฟาริน</p>
+          <p class="splash-app-subtitle">ระบบบริหารจัดการคลินิกวาร์ฟาริน<br/>โรงพยาบาลสระโบสถ์</p>
+        </div>
+        <div class="splash-loading-wrap">
+          <div class="splash-dots">
+            <div class="splash-dot"></div>
+            <div class="splash-dot"></div>
+            <div class="splash-dot"></div>
+          </div>
+          <p class="splash-loading-label" id="splash-loading-label">กำลังโหลด...</p>
+        </div>
+        <span class="splash-version">v1.1.1</span>
+      </div>
+    </div>
+
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+
+    <script>
+      (function () {
+        var label = document.getElementById('splash-loading-label');
+        function attachListener() {
+          if (
+            typeof window.__TAURI__ !== 'undefined' &&
+            window.__TAURI__.event &&
+            typeof window.__TAURI__.event.listen === 'function'
+          ) {
+            window.__TAURI__.event.listen('splash-status', function (event) {
+              if (label && event.payload) {
+                label.textContent = event.payload;
+              }
+            });
+          } else {
+            setTimeout(attachListener, 80);
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', attachListener);
+        } else {
+          attachListener();
+        }
+      })();
+    </script>
   </body>
 </html>
