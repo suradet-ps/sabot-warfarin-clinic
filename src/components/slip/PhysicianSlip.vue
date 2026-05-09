@@ -168,8 +168,10 @@ const sideEffectOptionsHigh: Record<string, string> = {
   hematoma: 'ห้อเลือด',
 }
 const sideEffectOptionsLow: Record<string, string> = {
-  nausea: 'คลื่นไส้',
-  hair_loss: 'ผมร่วง',
+  headache: 'ปวดหัว',
+  dizziness_fatigue: 'เวียนศีรษะหรืออ่อนเพลีย',
+  faint_breath: 'รู้สึกหวิวหรือหายใจติดขัด',
+  numbness_weakness: 'มีอาการชา หรือกล้ามเนื้ออ่อนแรง',
   other: 'อื่นๆ',
 }
 

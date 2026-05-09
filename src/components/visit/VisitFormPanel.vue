@@ -77,8 +77,10 @@ const sideEffectOptionsHigh = [
   { key: 'hematoma', label: 'ห้อเลือด' },
 ]
 const sideEffectOptionsLow = [
-  { key: 'nausea', label: 'คลื่นไส้' },
-  { key: 'hair_loss', label: 'ผมร่วง' },
+  { key: 'headache', label: 'ปวดหัว' },
+  { key: 'dizziness_fatigue', label: 'เวียนศีรษะหรืออ่อนเพลีย' },
+  { key: 'faint_breath', label: 'รู้สึกหวิวหรือหายใจติดขัด' },
+  { key: 'numbness_weakness', label: 'มีอาการชา หรือกล้ามเนื้ออ่อนแรง' },
   { key: 'other', label: 'อื่นๆ' },
 ]
 const selectedSideEffects = ref<string[]>([])
