@@ -117,7 +117,7 @@ onMounted(() => { void loadInteractions() })
         </table>
       </div>
 
-      <div :class="['summary-card', summary?.trend === 'increase' ? 'card-feature-coral' : summary?.trend === 'decrease' ? 'card-feature-yellow' : 'card-feature-teal']">
+      <div :class="['summary-card', summary?.trend === 'increase' ? 'card-feature-coral' : summary?.trend === 'decrease' ? 'card-feature-yellow' : 'card-feature-pink-dark']">
         <div class="summary-header">
           <AlertTriangle :size="20" />
           <span class="h5">สรุปแนวโน้ม Drug interaction</span>
@@ -166,7 +166,7 @@ onMounted(() => { void loadInteractions() })
 .stat-item { display: flex; align-items: center; gap: var(--spacing-xs); }
 .stat-value { font-size: 1.5rem; font-weight: 700; }
 .stat-label { font-size: 0.875rem; color: var(--color-slate); }
-.stat-icon.increase { color: var(--color-brand-red); }
-.stat-icon.decrease { color: var(--color-brand-coral); }
+.stat-icon.increase { color: var(--color-inr-high-bg); }
+.stat-icon.decrease { color: var(--color-coral-500); }
 .stat-trend { margin-left: auto; }
 </style>

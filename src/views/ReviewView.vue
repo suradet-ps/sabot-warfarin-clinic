@@ -225,7 +225,7 @@ onMounted(() => {
 }
 
 .empty-icon {
-  color: var(--color-success-accent);
+  color: var(--color-inr-safe);
 }
 
 .table-wrap {
@@ -293,7 +293,7 @@ onMounted(() => {
   height: 28px;
   border: none;
   border-radius: var(--rounded-full);
-  background: var(--color-brand-teal);
+  background: var(--color-pink-600);
   color: var(--color-on-dark);
   font-weight: 600;
   cursor: pointer;
@@ -301,7 +301,7 @@ onMounted(() => {
 }
 
 .btn-approve:hover:not(:disabled) {
-  background: var(--color-brand-teal-dark);
+  background: var(--color-primary-pressed);
 }
 
 .btn-approve:disabled {

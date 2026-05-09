@@ -142,7 +142,7 @@ async function handlePull() {
 
 <template>
   <div class="sync-layout">
-    <section class="card-feature-teal sync-hero">
+    <section class="card-feature-pink-dark sync-hero">
       <div class="sync-title-row">
         <div>
           <div class="sync-kicker">
@@ -293,7 +293,7 @@ async function handlePull() {
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--rounded-full);
   background: var(--color-canvas);
-  color: var(--color-moss-dark);
+  color: var(--color-pink-600);
 }
 
 .sync-title {
@@ -405,13 +405,13 @@ async function handlePull() {
 }
 
 .success-block {
-  background: var(--color-teal-light);
-  color: var(--color-moss-dark);
+  background: var(--color-pink-100);
+  color: var(--color-pink-600);
 }
 
 .error-block {
-  background: var(--color-brand-red);
-  color: var(--color-brand-red-dark);
+  background: var(--color-inr-high-bg);
+  color: var(--color-inr-high);
 }
 
 .spinning {

@@ -255,10 +255,10 @@ const xTicks = computed(() => {
   stroke-width: 1;
 }
 .target-band {
-  fill: color-mix(in srgb, var(--color-success-accent) 10%, transparent);
+  fill: color-mix(in srgb, var(--color-inr-safe) 10%, transparent);
 }
 .target-line {
-  stroke: var(--color-success-accent);
+  stroke: var(--color-inr-safe);
   stroke-width: 1.5;
   stroke-dasharray: 7 7;
 }

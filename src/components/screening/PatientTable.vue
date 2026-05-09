@@ -23,6 +23,20 @@ function ageLabel(birthday: string): string {
   return age === null ? '-' : `${age} ปี`
 }
 
+function getStrengthClass(strength: string): string {
+  if (strength.includes('2')) return 'pill-strength-2mg'
+  if (strength.includes('3')) return 'pill-strength-3mg'
+  if (strength.includes('5')) return 'pill-strength-5mg'
+  return 'pill-muted'
+}
+
+function getStrengthLabel(strength: string): string {
+  if (strength.includes('2')) return '2 mg'
+  if (strength.includes('3')) return '3 mg'
+  if (strength.includes('5')) return '5 mg'
+  return strength
+}
+
 function goToPage(page: number) {
   if (page < 1 || page > totalPages.value || page === props.page) return
   emit('pageChange', page)
@@ -59,7 +73,7 @@ function goToPage(page: number) {
           <td>{{ ageLabel(r.birthday) }}</td>
           <td>{{ formatThaiDate(r.lastDispenseDate) }}</td>
           <td>{{ r.totalDispenseVisits }}</td>
-          <td><span v-for="s in r.strengthsReceived" :key="s" class="badge badge-info" style="margin-right: 4px">{{ s }}</span></td>
+          <td><span v-for="s in r.strengthsReceived" :key="s" :class="['badge', getStrengthClass(s)]" style="margin-right: 4px">{{ getStrengthLabel(s) }}</span></td>
           <td>
             <span v-if="r.isEnrolled" class="badge badge-success">ลงทะเบียนแล้ว</span>
             <span v-else class="badge badge-muted">ยังไม่ลงทะเบียน</span>

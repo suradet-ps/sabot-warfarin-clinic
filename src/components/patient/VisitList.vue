@@ -141,8 +141,8 @@ function adherenceBadgeClass(a?: string | null) {
   transition: background-color 0.15s, color 0.15s;
 }
 .btn-icon:hover {
-  background: var(--color-brand-red-light);
-  color: var(--color-brand-red-dark);
+  background: var(--color-inr-high-bg);
+  color: var(--color-inr-high);
 }
 .visit-detail { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-top: var(--spacing-sm); border-top: 1px solid var(--color-hairline-soft); }
 .detail-row { display: flex; gap: var(--spacing-sm); align-items: flex-start; }

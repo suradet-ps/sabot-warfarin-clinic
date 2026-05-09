@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{
   label: string
-  color?: 'coral' | 'teal' | 'purple' | 'success' | 'danger' | 'muted' | 'yellow'
+  color?: 'coral' | 'pink' | 'success' | 'danger' | 'muted' | 'yellow'
 }>()
 </script>
 
@@ -10,11 +10,10 @@ const props = defineProps<{
 </template>
 
 <style scoped>
-.pill-coral { background: var(--color-coral-light); color: var(--color-coral-dark); }
-.pill-teal { background: var(--color-teal-light); color: var(--color-moss-dark); }
-.pill-purple { background: var(--color-surface-pricing-featured); color: var(--color-brand-blue); }
-.pill-success { background: var(--color-success-accent); color: var(--color-on-primary); }
-.pill-danger { background: var(--color-brand-red); color: var(--color-brand-red-dark); }
+.pill-coral { background: var(--color-coral-100); color: var(--color-coral-500); }
+.pill-pink { background: var(--color-pink-100); color: var(--color-pink-600); }
+.pill-success { background: var(--color-inr-safe); color: var(--color-on-primary); }
+.pill-danger { background: var(--color-inr-high-bg); color: var(--color-inr-high); }
 .pill-muted { background: var(--color-surface); color: var(--color-stone); }
-.pill-yellow { background: var(--color-yellow-light); color: var(--color-yellow-dark); }
+.pill-yellow { background: var(--color-yellow-100); color: var(--color-yellow-500); }
 </style>

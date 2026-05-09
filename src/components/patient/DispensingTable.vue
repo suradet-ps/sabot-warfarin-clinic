@@ -86,6 +86,6 @@ function regimenSummary(items: DispensingRecord[]): string {
 .empty-cell { text-align: center; color: var(--color-stone); }
 .comparison-row td { border-bottom-color: var(--color-hairline-soft); }
 .drug-stack, .usage-stack, .calc-stack { display: flex; flex-direction: column; gap: 2px; }
-.calc-note { color: var(--color-brand-coral); }
-.calc-missing { color: var(--color-brand-red-dark); }
+.calc-note { color: var(--color-coral-500); }
+.calc-missing { color: var(--color-inr-high); }
 </style>

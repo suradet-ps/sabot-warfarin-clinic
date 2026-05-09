@@ -1,60 +1,84 @@
 /* ========================================================
-   DESIGN TOKENS — Warfarin Clinic (Miro-inspired system)
-   Source of truth: DESIGN.md
+   DESIGN TOKENS — Warfarin Clinic v1.2
+   Pink Heart Theme — Source of truth: DESIGN.md
    NEVER hardcode hex values or px sizes outside this file
    ======================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap');
 
 :root {
-  --color-brand-yellow: #ffd02b;
-  --color-brand-yellow-deep: #f5c000;
-  --color-yellow-light: #fffbe6;
-  --color-yellow-dark: #5c4a00;
-  --color-brand-blue: #1a6fff;
-  --color-blue-pressed: #0050d4;
-  --color-brand-coral: #ff6b4a;
-  --color-coral-light: #fff0ec;
-  --color-coral-dark: #7a1a00;
-  --color-brand-rose: #f9d0d0;
-  --color-rose-light: #fdf0f0;
-  --color-brand-teal: #00b3a6;
-  --color-teal-light: #e6faf9;
-  --color-moss-dark: #004d47;
-  --color-brand-pink: #fce4ec;
-  --color-brand-orange-light: #fff3e0;
-  --color-canvas: #ffffff;
-  --color-surface: #f7f7f8;
-  --color-surface-soft: #fafafa;
-  --color-surface-yellow: #fffbe6;
-  --color-surface-pricing-featured: #f0f1ff;
-  --color-hairline: #e5e5e6;
-  --color-hairline-soft: #f0f0f1;
-  --color-hairline-strong: #c8c8ca;
-  --color-ink-deep: #050038;
-  --color-ink: #1a1a2e;
-  --color-charcoal: #2d2d3a;
-  --color-slate: #5a5a72;
-  --color-steel: #8a8a9c;
-  --color-stone: #b0b0be;
-  --color-muted: #d0d0d8;
-  --color-on-dark: #ffffff;
+  /* Brand — Pink Scale */
+  --color-pink-900: #831843;
+  --color-pink-700: #BE185D;
+  --color-pink-600: #EC4899;
+  --color-pink-500: #F472B6;
+  --color-pink-300: #F9A8D4;
+  --color-pink-100: #FCE7F3;
+  --color-pink-50:  #FDF2F8;
+
+  /* Primary CTA (dark pink) */
+  --color-primary:     #BE185D;
+  --color-primary-hover: #DB2777;
+  --color-on-primary: #FFFFFF;
+  --color-primary-pressed: #831843;
+
+  /* Brand — Coral (warm analogue) */
+  --color-coral-500: #F97316;
+  --color-coral-100: #FFEDD5;
+
+  /* Brand — Yellow (split-complementary) */
+  --color-yellow-500: #EAB308;
+  --color-yellow-100: #FEF9C3;
+
+  /* Surface */
+  --color-canvas:          #FFFFFF;
+  --color-surface:         #F7F7F8;
+  --color-surface-soft:    #FAFAFA;
+  --color-hairline:        #E5E5E6;
+  --color-hairline-soft:   #F0F0F1;
+  --color-hairline-strong: #C8C8CA;
+
+  /* Text */
+  --color-ink-deep:   #050038;
+  --color-ink:        #1A1A2E;
+  --color-charcoal:   #2D2D3A;
+  --color-slate:      #5A5A72;
+  --color-steel:      #8A8A9C;
+  --color-stone:      #A1A1AA;
+  --color-muted:      #D0D0D8;
+  --color-on-dark:    #FFFFFF;
   --color-on-dark-muted: rgba(255,255,255,0.7);
-  --color-success-accent: #00a878;
-  --color-brand-red: #ffecec;
-  --color-brand-red-dark: #d63b3b;
-  --color-primary: #1a1a2e;
-  --color-on-primary: #ffffff;
-  --color-footer-bg: #050038;
-  --font-family-primary: 'Roobert PRO', 'Noto Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --typography-hero-display-size: 80px;
-  --typography-hero-display-weight: 500;
-  --typography-hero-display-line-height: 1.05;
-  --typography-hero-display-letter-spacing: -2px;
-  --typography-display-lg-size: 60px;
-  --typography-display-lg-weight: 500;
-  --typography-display-lg-line-height: 1.10;
-  --typography-display-lg-letter-spacing: -1.5px;
+
+  /* Semantic — INR Status */
+  --color-inr-safe:       #059669;
+  --color-inr-safe-bg:    #D1FAE5;
+  --color-inr-low:        #D97706;
+  --color-inr-low-bg:     #FEF3C7;
+  --color-inr-high:       #DC2626;
+  --color-inr-high-bg:    #FEE2E2;
+  --color-inr-critical:   #991B1B;
+  --color-inr-none:       #A1A1AA;
+  --color-inr-none-bg:    #F4F4F5;
+
+  /* Semantic — TTR Badge */
+  --color-ttr-good:  #34D399;
+  --color-ttr-warn:  #FBBF24;
+  --color-ttr-bad:   #F87171;
+
+  /* Semantic — General */
+  --color-success:  #059669;
+  --color-warning:  #D97706;
+  --color-danger:   #DC2626;
+
+  /* Pill — Warfarin Strength */
+  --color-pill-2mg:  #FED7AA;
+  --color-pill-2mg-text: #9A3412;
+  --color-pill-3mg:  #BFDBFE;
+  --color-pill-3mg-text: #1E40AF;
+  --color-pill-5mg:  #FCE7F3;
+  --color-pill-5mg-text: #831843;
+
+  /* Typography */
   --typography-heading-1-size: 48px;
   --typography-heading-1-weight: 500;
   --typography-heading-1-line-height: 1.15;
@@ -66,15 +90,12 @@
   --typography-heading-3-size: 28px;
   --typography-heading-3-weight: 500;
   --typography-heading-3-line-height: 1.25;
-  --typography-heading-3-letter-spacing: 0;
   --typography-heading-4-size: 22px;
   --typography-heading-4-weight: 500;
   --typography-heading-4-line-height: 1.30;
-  --typography-heading-4-letter-spacing: 0;
   --typography-heading-5-size: 18px;
   --typography-heading-5-weight: 500;
   --typography-heading-5-line-height: 1.40;
-  --typography-heading-5-letter-spacing: 0;
   --typography-subtitle-size: 18px;
   --typography-subtitle-weight: 400;
   --typography-subtitle-line-height: 1.50;
@@ -106,10 +127,8 @@
   --typography-button-md-size: 14px;
   --typography-button-md-weight: 500;
   --typography-button-md-line-height: 1.30;
-  --typography-stat-display-size: 64px;
-  --typography-stat-display-weight: 500;
-  --typography-stat-display-line-height: 1.10;
-  --typography-stat-display-letter-spacing: -1.5px;
+
+  /* Spacing */
   --spacing-xxs: 4px;
   --spacing-xs: 8px;
   --spacing-sm: 12px;
@@ -120,8 +139,8 @@
   --spacing-xxxl: 40px;
   --spacing-section-sm: 48px;
   --spacing-section: 64px;
-  --spacing-section-lg: 96px;
-  --spacing-hero: 120px;
+
+  /* Border Radius */
   --rounded-xs: 4px;
   --rounded-sm: 6px;
   --rounded-md: 8px;
@@ -129,11 +148,12 @@
   --rounded-xl: 16px;
   --rounded-xxl: 20px;
   --rounded-xxxl: 28px;
-  --rounded-feature: 32px;
   --rounded-full: 9999px;
+
+  /* Elevation (shadow color uses pink-900) */
   --elevation-0: none;
-  --elevation-1: rgba(5, 0, 56, 0.04) 0px 1px 2px 0px;
-  --elevation-2: rgba(5, 0, 56, 0.06) 0px 4px 12px 0px;
-  --elevation-3: rgba(5, 0, 56, 0.08) 0px 12px 32px -4px;
-  --elevation-4: rgba(5, 0, 56, 0.12) 0px 16px 48px -8px;
+  --elevation-1: 0 1px 2px rgba(131, 24, 67, 0.06);
+  --elevation-2: 0 4px 12px rgba(131, 24, 67, 0.08);
+  --elevation-3: 0 8px 24px rgba(131, 24, 67, 0.10);
+  --elevation-4: 0 16px 48px rgba(131, 24, 67, 0.14);
 }

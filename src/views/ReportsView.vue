@@ -26,7 +26,7 @@ const reportCards = computed(() => [
     title: 'TTR เฉลี่ย',
     value: ttr.value ? `${ttr.value.meanTtr.toFixed(0)}%` : '-',
     description: 'Rosendaal method · 6 เดือนล่าสุด',
-    tone: 'card-feature-teal',
+    tone: 'card-feature-pink-dark',
     rows: ttr.value ? [['ค่าเฉลี่ยทั้งคลินิก', `${ttr.value.meanTtr.toFixed(2)}%`]] : [],
   },
   {

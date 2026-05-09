@@ -41,9 +41,31 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.app-header { min-height: 4rem; display: flex; align-items: center; justify-content: space-between; padding: 0 var(--spacing-xl); border-bottom: 1px solid var(--color-hairline); background: var(--color-canvas); }
-.header-title { font-size: var(--typography-heading-4-size); font-weight: var(--typography-heading-4-weight); color: var(--color-ink); }
+.app-header {
+  min-height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--spacing-xl);
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+.header-title {
+  font-size: var(--typography-heading-4-size);
+  font-weight: var(--typography-heading-4-weight);
+  color: var(--color-ink);
+}
 .header-subtitle { color: var(--color-slate); }
 .header-actions { display: flex; align-items: center; }
-.alert-pill { display: inline-flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-xs) var(--spacing-md); border-radius: var(--rounded-full); background: var(--color-brand-red); color: var(--color-brand-red-dark); }
+.alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--rounded-full);
+  background: var(--color-inr-high-bg);
+  color: var(--color-inr-high);
+  font-size: var(--typography-body-sm-medium-size);
+  font-weight: var(--typography-body-sm-medium-weight);
+}
 </style>

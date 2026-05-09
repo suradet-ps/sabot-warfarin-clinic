@@ -16,22 +16,24 @@ html, body, #app {
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  overflow: hidden;
-}
+body { overflow: hidden; }
 
+/* ---- Typography ---- */
 .h1 { font-size: var(--typography-heading-1-size); font-weight: var(--typography-heading-1-weight); line-height: var(--typography-heading-1-line-height); letter-spacing: var(--typography-heading-1-letter-spacing); }
 .h2 { font-size: var(--typography-heading-2-size); font-weight: var(--typography-heading-2-weight); line-height: var(--typography-heading-2-line-height); letter-spacing: var(--typography-heading-2-letter-spacing); }
 .h3 { font-size: var(--typography-heading-3-size); font-weight: var(--typography-heading-3-weight); line-height: var(--typography-heading-3-line-height); }
 .h4 { font-size: var(--typography-heading-4-size); font-weight: var(--typography-heading-4-weight); line-height: var(--typography-heading-4-line-height); }
 .h5 { font-size: var(--typography-heading-5-size); font-weight: var(--typography-heading-5-weight); line-height: var(--typography-heading-5-line-height); }
+.subtitle { font-size: var(--typography-subtitle-size); font-weight: var(--typography-subtitle-weight); line-height: var(--typography-subtitle-line-height); }
 .body-md { font-size: var(--typography-body-md-size); font-weight: var(--typography-body-md-weight); line-height: var(--typography-body-md-line-height); }
 .body-md-medium { font-size: var(--typography-body-md-medium-size); font-weight: var(--typography-body-md-medium-weight); line-height: var(--typography-body-md-medium-line-height); }
 .body-sm { font-size: var(--typography-body-sm-size); font-weight: var(--typography-body-sm-weight); line-height: var(--typography-body-sm-line-height); }
 .body-sm-medium { font-size: var(--typography-body-sm-medium-size); font-weight: var(--typography-body-sm-medium-weight); line-height: var(--typography-body-sm-medium-line-height); }
 .caption { font-size: var(--typography-caption-size); font-weight: var(--typography-caption-weight); line-height: var(--typography-caption-line-height); }
+.caption-bold { font-size: var(--typography-caption-bold-size); font-weight: var(--typography-caption-bold-weight); line-height: var(--typography-caption-bold-line-height); }
 .micro { font-size: var(--typography-micro-size); font-weight: var(--typography-micro-weight); line-height: var(--typography-micro-line-height); }
 
+/* ---- Buttons ---- */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -50,11 +52,20 @@ body {
   text-decoration: none;
 }
 .btn-primary { background: var(--color-primary); color: var(--color-on-primary); }
-.btn-primary:active { background: var(--color-charcoal); }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:active { background: var(--color-primary-pressed); }
 .btn-primary:disabled { background: var(--color-hairline); color: var(--color-muted); cursor: not-allowed; }
-.btn-secondary { background: transparent; color: var(--color-ink); border: 1px solid var(--color-hairline-strong); }
-.btn-ghost { background: transparent; color: var(--color-ink); border-radius: var(--rounded-md); padding: 8px 12px; }
 
+.btn-danger { background: var(--color-danger); color: var(--color-on-primary); }
+.btn-danger:disabled { background: var(--color-hairline); color: var(--color-muted); cursor: not-allowed; }
+
+.btn-secondary { background: transparent; color: var(--color-ink); border: 1px solid var(--color-hairline-strong); }
+.btn-secondary:hover { background: var(--color-surface-soft); }
+
+.btn-ghost { background: transparent; color: var(--color-slate); border-radius: var(--rounded-md); padding: 8px 12px; }
+.btn-ghost:hover { background: var(--color-surface-soft); color: var(--color-ink); }
+
+/* ---- Cards ---- */
 .card {
   background: var(--color-canvas);
   border-radius: var(--rounded-xl);
@@ -63,18 +74,45 @@ body {
   box-shadow: var(--elevation-2);
 }
 .card-feature { background: var(--color-canvas); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); border: 1px solid var(--color-hairline-soft); }
-.card-feature-coral { background: var(--color-coral-light); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
-.card-feature-teal { background: var(--color-teal-light); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
+.card-feature-pink { background: var(--color-pink-50); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
+.card-feature-pink-dark { background: var(--color-pink-100); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
+.card-feature-coral { background: var(--color-coral-100); border-radius: var(--rounded-xxxl); padding: var(--spacing-xxl); }
 
-.badge { display: inline-flex; align-items: center; font-size: var(--typography-caption-bold-size); font-weight: var(--typography-caption-bold-weight); border-radius: var(--rounded-full); padding: var(--spacing-xs) var(--spacing-sm); white-space: nowrap; }
-.badge-success { background: var(--color-success-accent); color: var(--color-on-primary); }
-.badge-warning { background: var(--color-coral-light); color: var(--color-coral-dark); }
-.badge-danger { background: var(--color-brand-red); color: var(--color-brand-red-dark); }
-.badge-muted { background: var(--color-surface); color: var(--color-stone); }
-.badge-info { background: var(--color-surface-pricing-featured); color: var(--color-brand-blue); }
-.badge-tag-coral { background: var(--color-brand-coral); color: var(--color-on-primary); }
-.badge-tag-purple { background: var(--color-surface-pricing-featured); color: var(--color-brand-blue); }
+/* ---- Badges ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--typography-caption-bold-size);
+  font-weight: var(--typography-caption-bold-weight);
+  border-radius: var(--rounded-full);
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+.badge-success { background: var(--color-inr-safe-bg); color: var(--color-inr-safe); }
+.badge-warning { background: var(--color-inr-low-bg); color: var(--color-inr-low); }
+.badge-danger  { background: var(--color-inr-high-bg); color: var(--color-inr-high); }
+.badge-muted   { background: var(--color-surface); color: var(--color-stone); }
+.badge-info    { background: var(--color-pink-100); color: var(--color-pink-600); }
+.badge-tag-coral { background: var(--color-coral-100); color: var(--color-coral-500); }
 
+/* ---- INR Status Badges ---- */
+.badge-inr-safe     { background: var(--color-inr-safe-bg); color: var(--color-inr-safe); }
+.badge-inr-low      { background: var(--color-inr-low-bg);  color: var(--color-inr-low);  }
+.badge-inr-high     { background: var(--color-inr-high-bg); color: var(--color-inr-high); }
+.badge-inr-critical { background: var(--color-inr-critical-bg); color: var(--color-inr-critical); }
+.badge-inr-none     { background: var(--color-inr-none-bg); color: var(--color-inr-none); }
+
+/* ---- TTR Badges ---- */
+.ttr-badge-good { background: var(--color-ttr-good); color: #fff; }
+.ttr-badge-warn { background: var(--color-ttr-warn); color: var(--color-ink-deep); }
+.ttr-badge-bad  { background: var(--color-ttr-bad); color: #fff; }
+
+/* ---- Warfarin Strength Pills ---- */
+.pill-strength-2mg { background: var(--color-pill-2mg); color: var(--color-pill-2mg-text); }
+.pill-strength-3mg { background: var(--color-pill-3mg); color: var(--color-pill-3mg-text); }
+.pill-strength-5mg { background: var(--color-pill-5mg); color: var(--color-pill-5mg-text); }
+
+/* ---- Inputs ---- */
 .input {
   background: var(--color-canvas);
   color: var(--color-ink);
@@ -86,9 +124,10 @@ body {
   font-size: var(--typography-body-sm-size);
   width: 100%;
 }
-.input:focus { outline: none; border-color: var(--color-brand-blue); }
+.input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(190, 24, 93, 0.15); }
 select.input { cursor: pointer; }
 
+/* ---- Tables ---- */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -115,3 +154,30 @@ select.input { cursor: pointer; }
   color: var(--color-ink);
 }
 .table tr:last-child td { border-bottom: none; }
+.table-hover tbody tr:hover { background: var(--color-surface-soft); cursor: pointer; }
+
+/* ---- Divider ---- */
+.divider { height: 1px; background: var(--color-hairline-soft); margin: var(--spacing-lg) 0; }
+
+/* ---- Surface ---- */
+.surface { background: var(--color-surface); }
+.surface-soft { background: var(--color-surface-soft); }
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-hairline-strong); border-radius: var(--rounded-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-stone); }
+
+/* ---- Focus ---- */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---- Color Tints for RegimenOptionCard day headers ---- */
+.bg-yellow-tint { background: var(--color-yellow-100); color: var(--color-yellow-500); }
+.bg-pink-tint { background: var(--color-pink-100); color: var(--color-pink-600); }
+.bg-orange-tint { background: var(--color-coral-100); color: var(--color-coral-500); }
+.bg-blue-tint { background: #DBEAFE; color: #1D4ED8; }
+.bg-coral-tint { background: var(--color-coral-100); color: var(--color-coral-500); }

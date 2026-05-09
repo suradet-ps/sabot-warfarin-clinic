@@ -9,8 +9,8 @@ const props = defineProps<{
 
 const config = computed(() => {
   if (props.variant === 'appointment') {
-    const appointmentMap: Record<string, { label: string; color: 'purple' | 'success' | 'danger' | 'muted' }> = {
-      scheduled: { label: 'นัดหมาย', color: 'purple' },
+    const appointmentMap: Record<string, { label: string; color: 'pink' | 'success' | 'danger' | 'muted' }> = {
+      scheduled: { label: 'นัดหมาย', color: 'pink' },
       completed: { label: 'เสร็จสิ้น', color: 'success' },
       missed: { label: 'ขาดนัด', color: 'danger' },
       cancelled: { label: 'ยกเลิก', color: 'muted' },

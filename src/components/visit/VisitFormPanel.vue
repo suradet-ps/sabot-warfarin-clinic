@@ -394,9 +394,9 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
               :loading="loadingDoseOptions"
               @select="handleSelectDoseOption"
             />
-            <p v-if="doseOptionsError" class="caption" style="color: var(--color-brand-coral)">{{ doseOptionsError }}</p>
+            <p v-if="doseOptionsError" class="caption" style="color: var(--color-coral-500)">{{ doseOptionsError }}</p>
             <p v-else-if="doseOptionsHint" class="caption" style="color: var(--color-slate)">{{ doseOptionsHint }}</p>
-            <p v-if="selectedDoseOptionIndex !== null" class="body-sm-medium" style="color: var(--color-success-accent)">
+            <p v-if="selectedDoseOptionIndex !== null" class="body-sm-medium" style="color: var(--color-inr-safe)">
               ✓ เลือกตัวเลือก {{ selectedDoseOptionIndex + 1 }} แล้ว ตารางยาใหม่จะถูกอัพเดทด้านล่าง
             </p>
           </div>
@@ -487,10 +487,10 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
   padding: var(--spacing-md);
   border: 1px solid var(--color-hairline-soft);
   border-radius: var(--rounded-xl);
-  background: var(--color-teal-light);
+  background: var(--color-pink-100);
 }
 .dose-source-text { color: var(--color-slate); }
-.dose-warning { color: var(--color-brand-coral); }
+.dose-warning { color: var(--color-coral-500); }
 .btn-compact { padding-inline: var(--spacing-md); white-space: nowrap; }
 .form-section { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .label { color: var(--color-slate); }

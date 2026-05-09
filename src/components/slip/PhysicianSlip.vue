@@ -132,7 +132,7 @@ const chartPalette = computed(() => ({
   line: getCssVar('--color-primary') || '#111111',
   canvas: getCssVar('--color-canvas') || '#ffffff',
   grid: getCssVar('--color-hairline-soft') || '#e5e5e6',
-  target: getCssVar('--color-success-accent') || '#16a34a',
+  target: getCssVar('--color-inr-safe') || '#16a34a',
   text: getCssVar('--color-slate') || '#6b7280',
 }))
 
@@ -552,7 +552,7 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .new-dose-row td {
-  background: var(--color-teal-light);
+  background: var(--color-pink-100);
   font-weight: 600;
 }
 
@@ -627,7 +627,7 @@ function daysFromNow(dateStr: string | null): string {
 
 .adr-items {
   font-size: var(--typography-body-md-size);
-  color: var(--color-brand-coral);
+color: var(--color-coral-500);
   font-weight: 600;
 }
 
@@ -691,13 +691,13 @@ function daysFromNow(dateStr: string | null): string {
 }
 
 .pharmacist-box .box-header {
-  background: #f0f4ff;
-  color: var(--color-brand-blue);
+  background: var(--color-pink-100);
+  color: var(--color-pink-600);
 }
 
 .doctor-box .box-header {
-  background: #e6faf9;
-  color: var(--color-brand-teal);
+  background: var(--color-pink-100);
+  color: var(--color-pink-600);
 }
 
 .box-body {
@@ -729,9 +729,9 @@ function daysFromNow(dateStr: string | null): string {
   color: var(--color-ink);
 }
 
-.ttr-good { color: var(--color-success-accent); }
-.ttr-warn { color: var(--color-brand-coral); }
-.ttr-bad { color: var(--color-brand-red-dark); }
+.ttr-good { color: var(--color-ttr-good); }
+.ttr-warn { color: var(--color-ttr-warn); }
+.ttr-bad { color: var(--color-ttr-bad); }
 
 @media print {
   .slip-sheet {

@@ -16,7 +16,7 @@ const badgeClass = computed(() => {
 </template>
 
 <style scoped>
-.good { background: var(--color-success-accent); color: var(--color-on-primary); }
-.fair { background: var(--color-brand-coral); color: var(--color-on-primary); }
-.poor { background: var(--color-brand-red-dark); color: var(--color-on-primary); }
+.good { background: var(--color-ttr-good); color: #fff; }
+.fair { background: var(--color-ttr-warn); color: var(--color-ink-deep); }
+.poor { background: var(--color-ttr-bad); color: #fff; }
 </style>

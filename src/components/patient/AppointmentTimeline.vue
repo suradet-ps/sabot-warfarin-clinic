@@ -66,7 +66,7 @@ onMounted(() => {
       <div class="form-actions"><button type="button" class="btn btn-ghost" @click="showForm = false">&#x0E22;&#x0E01;&#x0E40;&#x0E25;&#x0E34;&#x0E01;</button><button type="submit" class="btn btn-primary" :disabled="saving">{{ saving ? '&#x0E01;&#x0E33;&#x0E25;&#x0E31;&#x0E07;&#x0E1A;&#x0E31;&#x0E19;&#x0E17;&#x0E36;&#x0E01;...' : '&#x0E1A;&#x0E31;&#x0E19;&#x0E17;&#x0E36;&#x0E01;&#x0E19;&#x0E31;&#x0E14;' }}</button></div>
     </form>
 
-    <div v-if="loading" class="empty-state card-feature-teal"><p class="body-sm">&#x0E01;&#x0E33;&#x0E25;&#x0E31;&#x0E07;&#x0E42;&#x0E2B;&#x0E25;&#x0E14;...</p></div>
+    <div v-if="loading" class="empty-state card-feature-pink-dark"><p class="body-sm">&#x0E01;&#x0E33;&#x0E25;&#x0E31;&#x0E07;&#x0E42;&#x0E2B;&#x0E25;&#x0E14;...</p></div>
     <div v-else-if="error" class="badge badge-danger error-box">{{ error }}</div>
     <div v-else-if="!orderedAppointments.length" class="empty-state"><p class="body-sm section-meta">&#x0E22;&#x0E31;&#x0E07;&#x0E44;&#x0E21;&#x0E48;&#x0E21;&#x0E35;&#x0E01;&#x0E32;&#x0E23;&#x0E19;&#x0E31;&#x0E14;&#x0E2B;&#x0E21;&#x0E32;&#x0E22;</p></div>
 
@@ -111,8 +111,8 @@ onMounted(() => {
 .timeline-list { display: flex; flex-direction: column; gap: var(--spacing-md); }
 .timeline-item { display: grid; grid-template-columns: auto 1fr; gap: var(--spacing-md); }
 .timeline-dot { width: var(--spacing-md); height: var(--spacing-md); margin-top: var(--spacing-xs); border-radius: var(--rounded-full); background: var(--color-stone); }
-.timeline-dot[data-status='scheduled'] { background: var(--color-brand-blue); }
-.timeline-dot[data-status='completed'] { background: var(--color-success-accent); }
-.timeline-dot[data-status='missed'] { background: var(--color-brand-red-dark); }
+.timeline-dot[data-status='scheduled'] { background: var(--color-pink-600); }
+.timeline-dot[data-status='completed'] { background: var(--color-inr-safe); }
+.timeline-dot[data-status='missed'] { background: var(--color-inr-high); }
 .timeline-body { display: flex; flex-direction: column; gap: var(--spacing-xs); padding-bottom: var(--spacing-md); border-bottom: 1px solid var(--color-hairline-soft); }
 </style>

@@ -22,13 +22,13 @@ const emit = defineEmits<{
 const dayNames = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.']
 
 const dayHeaderColors = [
-  'bg-yellow-light',
-  'bg-rose-light',
-  'bg-teal-light',
-  'bg-orange-light',
-  'bg-blue-light',
-  'bg-purple-light',
-  'bg-coral-light',
+  'bg-yellow-tint',
+  'bg-pink-tint',
+  'bg-pink-tint',
+  'bg-orange-tint',
+  'bg-blue-tint',
+  'bg-pink-tint',
+  'bg-coral-tint',
 ]
 
 const headerLabel = computed(() => props.label || 'วิธีกินยา')
@@ -144,9 +144,15 @@ function getDayHeaderColor(dayIndex: number): string {
 }
 
 .option-selected {
-  border-color: var(--color-success-accent);
-  background: var(--color-teal-light);
-  box-shadow: 0 0 0 2px var(--color-success-accent);
+  border-color: var(--color-inr-safe);
+  background: var(--color-pink-50);
+  box-shadow: 0 0 0 2px var(--color-inr-safe);
+}
+
+.option-label {
+  font-size: var(--typography-caption-bold-size);
+  font-weight: 600;
+  color: var(--color-pink-900);
 }
 
 .option-header {
@@ -164,13 +170,13 @@ function getDayHeaderColor(dayIndex: number): string {
 }
 
 .check-icon {
-  color: var(--color-success-accent);
+  color: var(--color-inr-safe);
 }
 
 .option-label {
   font-size: var(--typography-caption-bold-size);
   font-weight: 600;
-  color: var(--color-moss-dark);
+  color: var(--color-pink-600);
 }
 
 .option-description {
@@ -204,7 +210,7 @@ function getDayHeaderColor(dayIndex: number): string {
 }
 
 .day-special {
-  border-color: var(--color-brand-coral);
+  border-color: var(--color-coral-500);
   border-width: 2px;
 }
 
