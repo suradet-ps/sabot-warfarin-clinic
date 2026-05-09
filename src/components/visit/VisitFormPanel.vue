@@ -378,7 +378,7 @@ onMounted(() => { if (modelValue.value) void loadDefaults() })
           </div>
 
           <div class="suggestion-row">
-            <button class="btn btn-secondary" @click="fetchSuggestion" :disabled="loadingSuggestion || inrValue === null">
+            <button class="btn btn-primary" @click="fetchSuggestion" :disabled="loadingSuggestion || inrValue === null">
               {{ loadingSuggestion ? 'กำลังคำนวณ...' : 'คำนวณขนาดยา' }}
             </button>
             <span v-if="suggestion" class="body-sm">
