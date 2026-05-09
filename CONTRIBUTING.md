@@ -10,17 +10,17 @@ git clone https://github.com/suradet-ps/sabot-warfarin-clinic.git
 cd sabot-warfarin-clinic
 
 # Install dependencies
-npm install
+bun install
 
 # Start development server
-npm run tauri dev
+bun run tauri dev
 ```
 
 ## Development Workflow
 
 1. **Create a feature branch**: `git checkout -b feature/your-feature-name`
 2. **Make your changes**: Follow the code style guidelines below
-3. **Run type-check**: `npm run type-check`
+3. **Run type-check**: `bun run type-check`
 4. **Test your changes**: Ensure the app builds successfully
 5. **Submit a pull request**: Describe your changes clearly
 
@@ -90,10 +90,10 @@ Before submitting:
 
 ```bash
 # Type-check TypeScript
-npm run type-check
+bun run type-check
 
 # Build frontend
-npm run build
+bun run build
 
 # Check Rust code
 cargo clippy --manifest-path src-tauri/Cargo.toml

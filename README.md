@@ -4,7 +4,7 @@
 [![Vue v3](https://img.shields.io/badge/Vue-3-green?style=flat&logo=vue.js)](https://vuejs.org)
 [![TypeScript v6](https://img.shields.io/badge/TypeScript-v6-blue?style=flat&logo=typescript)](https://www.typescriptlang.org)
 [![Rust](https://img.shields.io/badge/Rust-stable-orange?style=flat&logo=rust)](https://www.rust-lang.org)
-[![npm v8](https://img.shields.io/badge/npm-8-blue?style=flat&logo=npm)](https://www.npmjs.com)
+[![Bun](https://img.shields.io/badge/Bun-1.x-blue?style=flat&logo=bun)](https://bun.sh)
 [![Vite v8](https://img.shields.io/badge/Vite-8-blue?style=flat&logo=vite)](https://vitejs.dev)
 [![Pinia v3](https://img.shields.io/badge/Pinia-v3-green)](https://pinia.vuejs.org)
 [![Lucide Icons](https://img.shields.io/badge/Lucide-Icons-blue)](https://lucide.dev)
@@ -49,23 +49,23 @@ git clone https://github.com/suradet-ps/sabot-warfarin-clinic.git
 cd sabot-warfarin-clinic
 
 # Install dependencies
-npm install
+bun install
 
 # Configure MySQL connection (edit settings in-app)
-npm run tauri dev
+bun run tauri dev
 ```
 
 ## Development
 
 ```bash
 # Start development server
-npm run tauri dev
+bun run tauri dev
 
 # Run type-check
-npm run type-check
+bun run type-check
 
 # Build for production
-npm run tauri build
+bun run tauri build
 ```
 
 ## Key Modules

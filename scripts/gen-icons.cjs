@@ -53,14 +53,14 @@ const ICON_SVG = `<svg width="240" height="240" viewBox="0 0 200 200" fill="none
     log(`Saved ${path.basename(SOURCE_PNG)} (${Math.round(pngBuffer.length / 1024)} KB)`);
 
     log("Running tauri icon generator…");
-    execSync(`npm run tauri -- icon "${SOURCE_PNG}"`, {
+    execSync(`bun run tauri -- icon "${SOURCE_PNG}"`, {
       cwd: ROOT,
       stdio: IS_SILENT ? "pipe" : "inherit",
       timeout: 120_000,
     });
 
     log("All icons generated successfully in src-tauri/icons/");
-    log("Rebuild the app to apply: npm run tauri -- build");
+    log("Rebuild the app to apply: bun run tauri -- build");
   } catch (err) {
     error("Process failed:");
     error(err.message || err);
