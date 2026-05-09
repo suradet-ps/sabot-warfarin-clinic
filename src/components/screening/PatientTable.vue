@@ -84,6 +84,7 @@ function goToPage(page: number) {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  overflow-x: auto;
 }
 
 .table-meta,

@@ -174,42 +174,45 @@ onMounted(() => {
 
 .stat-row {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
 }
 
 .stat-chip {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-md);
 }
 
 .stat-icon {
-  color: var(--color-brand-teal);
+  color: var(--color-slate);
 }
 
 .search-box {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-md);
   background: var(--color-canvas);
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--rounded-full);
-  width: 280px;
+  border: 1px solid var(--color-hairline-soft);
+  border-radius: var(--rounded-md);
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .search-icon {
-  color: var(--color-slate);
+  color: var(--color-stone);
   flex-shrink: 0;
 }
 
 .search-input {
   border: none;
-  background: transparent;
   outline: none;
-  width: 100%;
+  background: transparent;
   font-size: var(--typography-body-sm-size);
+  color: var(--color-ink);
+  width: 200px;
+}
+
+.search-input::placeholder {
+  color: var(--color-stone);
 }
 
 .empty-state {

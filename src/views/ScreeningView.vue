@@ -61,15 +61,6 @@ watch(
   <div class="screening-view">
     <div class="page-toolbar">
       <div class="toolbar-left">
-        <div class="search-pill-wrap">
-          <Search :size="16" style="color: var(--color-steel)" />
-          <input
-            v-model.trim="store.filters.keyword"
-            class="search-pill-input"
-            placeholder="ค้นหา HN, ชื่อ, นามสกุล, เบอร์โทร"
-            @keydown.enter.prevent="runSearch()"
-          />
-        </div>
         <div class="date-field">
           <label class="date-label">จากวันที่</label>
           <div class="date-input-wrap">
@@ -84,13 +75,17 @@ watch(
             <Calendar :size="15" class="date-icon" @click="openDateToPicker" />
           </div>
         </div>
-        <!-- Enrollment status filter removed as requested -->
       </div>
-
-      <button class="btn btn-primary toolbar-button" @click="runSearch()">
-        <Search :size="16" />
-        ค้นหา
-      </button>
+      <div class="search-box">
+        <Search :size="16" class="search-icon" />
+        <input
+          v-model.trim="store.filters.keyword"
+          type="text"
+          class="search-input"
+          placeholder="ค้นหา HN, ชื่อ, นามสกุล, เบอร์โทร"
+          @keydown.enter.prevent="runSearch()"
+        />
+      </div>
     </div>
 
     <p class="caption helper-text"></p>
@@ -114,16 +109,17 @@ watch(
 
 <style scoped>
 .screening-view { display: flex; flex-direction: column; gap: var(--spacing-xl); }
-.page-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
-.toolbar-left { display: flex; align-items: flex-end; gap: var(--spacing-md); flex-wrap: wrap; flex: 1; }
-.search-pill-wrap { display: flex; align-items: center; gap: var(--spacing-xs); background: var(--color-surface); border: 1px solid var(--color-hairline); border-radius: var(--rounded-md); padding: 0 var(--spacing-md); height: 44px; min-width: 260px; }
-.search-pill-input { border: none; background: transparent; outline: none; font-family: var(--font-family-primary); font-size: var(--typography-body-sm-size); color: var(--color-ink); flex: 1; height: 100%; }
+.page-toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--spacing-md); flex-wrap: wrap; }
+.toolbar-left { display: flex; align-items: flex-end; gap: var(--spacing-md); flex-wrap: wrap; }
+.search-box { display: flex; align-items: center; gap: var(--spacing-xs); background: var(--color-canvas); border: 1px solid var(--color-hairline-soft); border-radius: var(--rounded-md); padding: var(--spacing-sm) var(--spacing-md); }
+.search-icon { color: var(--color-stone); flex-shrink: 0; }
+.search-input { border: none; outline: none; background: transparent; font-size: var(--typography-body-sm-size); color: var(--color-ink); width: 200px; }
+.search-input::placeholder { color: var(--color-stone); }
 .date-field { display: flex; flex-direction: column; gap: 4px; }
 .date-label { font-size: 12px; color: var(--color-slate); font-weight: 500; }
 .date-input-wrap { position: relative; display: flex; align-items: center; }
 .toolbar-date-input { width: 160px; padding-right: 32px; height: 44px; box-sizing: border-box; }
 .date-icon { position: absolute; right: 10px; color: var(--color-slate); cursor: pointer; pointer-events: auto; }
-.btn, .toolbar-button { height: 44px; display: inline-flex; align-items: center; padding: 0 14px; }
 .helper-text { color: var(--color-slate); }
 .loading-state, .error-state { padding: var(--spacing-xxl); text-align: center; color: var(--color-slate); }
 </style>
