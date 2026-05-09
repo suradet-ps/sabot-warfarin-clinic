@@ -116,7 +116,7 @@ Time in Therapeutic Range (TTR) is calculated using the **Rosendaal linear inter
 
 TTR ≥ 65% is considered acceptable (AHA/ACC guideline).
 
-## Warfarin Drug Codes (Sarabosot Hospital)
+## Warfarin Drug Codes (Sabot Hospital)
 
 | icode | Name | Strength |
 |-------|------|---------|

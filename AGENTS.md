@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A Tauri 2.10 (Rust) + Vue 3.5 (TypeScript) + lucide-vue-next desktop application for managing a warfarin anticoagulation clinic at Sarabosot Hospital. The system bridges HosXP's MySQL database (read-only) with a local SQLite database for clinic-specific tracking, INR trending, dose management, and physician communication slips.
+A Tauri 2.10 (Rust) + Vue 3.5 (TypeScript) + lucide-vue-next desktop application for managing a warfarin anticoagulation clinic at Sabot Hospital. The system bridges HosXP's MySQL database (read-only) with a local SQLite database for clinic-specific tracking, INR trending, dose management, and physician communication slips.
 
 ---
 
@@ -117,7 +117,7 @@ lab_order_result      VARCHAR
 > **INR lab_items_code = `751`**
 > Always query BOTH `lab_order` (via `lab_head`) AND `lab_app_order` (via `lab_app_head`) and merge results by date, deduplicated, to get the complete INR history for a patient.
 
-### Warfarin Drug Codes (Sarabosot Hospital)
+### Warfarin Drug Codes (Sabot Hospital)
 
 | icode | Name (drugitems.name) | Strength (drugitems.strength) |
 |-------|----------------------|-------------------------------|
