@@ -21,7 +21,6 @@
         "minHeight": 700,
         "center": true,
         "visible": true,
-        "backgroundColor": "#f6f5f4",
         "focus": true,
         "shadow": false,
         "decorations": true,

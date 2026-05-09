@@ -6,25 +6,21 @@ import { useSyncStore } from '#/stores/sync'
 
 const syncStore = useSyncStore()
 
-onMounted(async () => {
-  console.log('[App] mounted')
-
-  setTimeout(() => {
-    const splash = document.getElementById('splash-overlay')
-    if (splash) {
-      splash.classList.add('splash-fade-out')
-      setTimeout(() => splash.remove(), 300)
-    }
-  }, 1500)
-
-  try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const mainWindow = getCurrentWindow()
-    await mainWindow.show()
-    await mainWindow.setFocus()
-  } catch (e) {
-    console.warn('Window show skipped:', e)
+const hideSplash = () => {
+  const splash = document.getElementById('splash-overlay')
+  const card = splash?.querySelector('.splash-card') as HTMLElement
+  if (card) {
+    card.classList.add('splash-card-fade-out')
   }
+  if (splash) {
+    splash.classList.add('splash-fade-out')
+    setTimeout(() => splash.remove(), 400)
+  }
+}
+
+onMounted(async () => {
+  // Hide splash after minimum 2.8s for smooth UX
+  setTimeout(hideSplash, 2800)
 
   try {
     await syncStore.refreshAll()

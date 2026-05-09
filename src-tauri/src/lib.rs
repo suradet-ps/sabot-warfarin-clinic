@@ -109,7 +109,8 @@ fn initialise_app_state(app: &mut App) -> Result<()> {
       }
     }
 
-    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    // Keep splash visible for minimum 2.5s (handled by Vue)
+    tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
   });
 
   Ok(())

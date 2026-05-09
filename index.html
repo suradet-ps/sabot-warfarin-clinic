@@ -46,7 +46,7 @@
         -webkit-font-smoothing: antialiased;
         user-select: none;
         -webkit-user-select: none;
-        transition: opacity 0.3s ease, visibility 0.3s ease;
+        transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s ease;
       }
 
       #splash-overlay.splash-fade-out {
@@ -72,7 +72,16 @@
         width: 320px;
         position: relative;
         overflow: hidden;
-        animation: cardIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+        animation: cardIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      .splash-card.splash-card-fade-out {
+        animation: cardOut 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      }
+
+      @keyframes cardOut {
+        from { opacity: 1; transform: translateY(0) scale(1); }
+        to   { opacity: 0; transform: translateY(-8px) scale(0.97); }
       }
 
       .splash-icon-wrap {
