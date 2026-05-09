@@ -60,7 +60,7 @@ const appointmentText = computed(() => {
 
 <style scoped>
 .cell-stack { display: flex; flex-direction: column; gap: var(--spacing-xxs); }
-.hn-link { color: var(--color-pink-600); text-decoration: none; }
+.hn-link { color: var(--color-ink); text-decoration: none; }
 .row-actions { display: flex; justify-content: flex-end; gap: var(--spacing-xs); flex-wrap: wrap; }
 .action-button { min-width: max-content; }
 </style>
