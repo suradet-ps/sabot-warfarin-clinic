@@ -144,9 +144,9 @@ function getDayHeaderColor(dayIndex: number): string {
 }
 
 .option-selected {
-  border-color: var(--color-inr-safe);
+  border-color: var(--color-pink-600);
   background: var(--color-pink-50);
-  box-shadow: 0 0 0 2px var(--color-inr-safe);
+  box-shadow: 0 0 0 2px var(--color-pink-600);
 }
 
 .option-label {
