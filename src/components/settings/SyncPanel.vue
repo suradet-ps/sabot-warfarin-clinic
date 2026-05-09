@@ -122,7 +122,9 @@ async function handlePush() {
   try {
     await syncStore.push()
   } catch (error) {
-    actionError.value = error instanceof Error ? error.message : 'Push to cloud ไม่สำเร็จ'
+    console.error('Push error:', error)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    actionError.value = errorMsg || 'Push to cloud ไม่สำเร็จ'
   }
 }
 
@@ -131,7 +133,9 @@ async function handlePull() {
   try {
     await syncStore.pull()
   } catch (error) {
-    actionError.value = error instanceof Error ? error.message : 'Pull from cloud ไม่สำเร็จ'
+    console.error('Pull error:', error)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    actionError.value = errorMsg || 'Pull from cloud ไม่สำเร็จ - ตรวจสอบว่ารัน SQL ใน Supabase แล้ว'
   }
 }
 </script>

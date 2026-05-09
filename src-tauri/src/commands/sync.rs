@@ -172,18 +172,22 @@ where
     .json(rows)
     .send()
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("[{}] Network error: {}", table, e))?;
 
   if response.status().is_success() {
     return Ok(());
   }
 
-  Err(
-    response
-      .text()
-      .await
-      .unwrap_or_else(|_| "request failed".to_string()),
-  )
+  let status = response.status();
+  let body = response
+    .text()
+    .await
+    .unwrap_or_else(|_| "unknown error".to_string());
+
+  Err(format!(
+    "[{}] HTTP {} - Response: {}",
+    table, status, body
+  ))
 }
 
 #[tauri::command]
@@ -276,7 +280,7 @@ pub async fn push_to_supabase(
     &anon_key,
     &machine_id,
     "wf_patients",
-    "hn",
+    "sync_id",
     &patient_rows,
   )
   .await
@@ -454,59 +458,94 @@ pub async fn pull_from_supabase(
     &url,
     "wf_patients",
     &[
-      ("updated_at", format!("gt.{last_pull_at}")),
+      ("updated_at", format!("gt.{}", last_pull_at)),
       ("order", "updated_at.asc,sync_id.asc".to_string()),
     ],
   )?;
-  let patient_rows: Vec<WfPatientSync> = with_auth(client.get(patient_url), &anon_key, &machine_id)
+  let patient_response = with_auth(client.get(patient_url.clone()), &anon_key, &machine_id)
     .send()
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("[wf_patients] Network error: {} | URL: {}", e, patient_url))?;
+
+  if !patient_response.status().is_success() {
+    let status = patient_response.status();
+    let body = patient_response.text().await.unwrap_or_default();
+    return Err(format!("[wf_patients] HTTP {} - Response: {}\nQuery URL: {}", status, body, patient_url));
+  }
+
+  let patient_rows: Vec<WfPatientSync> = patient_response
     .json()
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("[wf_patients] JSON parse error: {} - Response may be empty or malformed", e))?;
+
   for row in &patient_rows {
-    let query = sqlx::query(
-      "INSERT INTO wf_patients \
-          (sync_id, machine_id, hn, enrolled_at, enrolled_by, status, indication, target_inr_low, \
-           target_inr_high, notes, created_at, updated_at, deleted_at, synced_at) \
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(hn) DO UPDATE SET \
-          sync_id = excluded.sync_id, \
-          machine_id = excluded.machine_id, \
-          hn = excluded.hn, \
-          enrolled_at = excluded.enrolled_at, \
-          enrolled_by = excluded.enrolled_by, \
-          status = excluded.status, \
-          indication = excluded.indication, \
-          target_inr_low = excluded.target_inr_low, \
-          target_inr_high = excluded.target_inr_high, \
-          notes = excluded.notes, \
-           created_at = excluded.created_at, \
-          updated_at = excluded.updated_at, \
-          deleted_at = excluded.deleted_at, \
-          synced_at = excluded.synced_at \
-         WHERE excluded.updated_at >= wf_patients.updated_at",
+    let sync_id = row.sync_id.as_ref().ok_or("[wf_patients] sync_id is null")?;
+
+    let existing: Option<String> = sqlx::query_scalar(
+      "SELECT updated_at FROM wf_patients WHERE sync_id = ?"
     )
-    .bind(&row.sync_id)
-    .bind(&row.machine_id)
-    .bind(&row.hn)
-    .bind(&row.enrolled_at)
-    .bind(&row.enrolled_by)
-    .bind(&row.status)
-    .bind(&row.indication)
-    .bind(row.target_inr_low)
-    .bind(row.target_inr_high)
-    .bind(&row.notes)
-    .bind(&row.created_at)
-    .bind(&row.updated_at)
-    .bind(&row.deleted_at)
-    .bind(&row.updated_at);
-    let affected = query
+    .bind(sync_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let affected = if let Some(existing_updated) = existing {
+      let should_update = row.updated_at > existing_updated;
+      if should_update {
+        sqlx::query(
+          "UPDATE wf_patients SET machine_id = ?, hn = ?, enrolled_at = ?, enrolled_by = ?, \
+           status = ?, indication = ?, target_inr_low = ?, target_inr_high = ?, notes = ?, \
+           created_at = ?, updated_at = ?, deleted_at = ?, synced_at = ? \
+           WHERE sync_id = ?"
+        )
+        .bind(&row.machine_id)
+        .bind(&row.hn)
+        .bind(&row.enrolled_at)
+        .bind(&row.enrolled_by)
+        .bind(&row.status)
+        .bind(&row.indication)
+        .bind(row.target_inr_low)
+        .bind(row.target_inr_high)
+        .bind(&row.notes)
+        .bind(&row.created_at)
+        .bind(&row.updated_at)
+        .bind(&row.deleted_at)
+        .bind(&row.updated_at)
+        .bind(sync_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected()
+      } else {
+        0
+      }
+    } else {
+      sqlx::query(
+        "INSERT INTO wf_patients \
+            (sync_id, machine_id, hn, enrolled_at, enrolled_by, status, indication, target_inr_low, \
+             target_inr_high, notes, created_at, updated_at, deleted_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(sync_id)
+      .bind(&row.machine_id)
+      .bind(&row.hn)
+      .bind(&row.enrolled_at)
+      .bind(&row.enrolled_by)
+      .bind(&row.status)
+      .bind(&row.indication)
+      .bind(row.target_inr_low)
+      .bind(row.target_inr_high)
+      .bind(&row.notes)
+      .bind(&row.created_at)
+      .bind(&row.updated_at)
+      .bind(&row.deleted_at)
+      .bind(&row.updated_at)
       .execute(&state.pool)
       .await
       .map_err(|e| e.to_string())?
-      .rows_affected();
+      .rows_affected()
+    };
+
     if affected > 0 {
       result.pulled += 1;
     } else {
@@ -519,78 +558,117 @@ pub async fn pull_from_supabase(
     "wf_visits",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let visit_rows: Vec<WfVisitSync> = with_auth(client.get(visit_url), &anon_key, &machine_id)
+  let visit_response = with_auth(client.get(visit_url.clone()), &anon_key, &machine_id)
     .send()
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("[wf_visits] Network error: {}", e))?;
+
+  if !visit_response.status().is_success() {
+    let status = visit_response.status();
+    let body = visit_response.text().await.unwrap_or_default();
+    return Err(format!("[wf_visits] HTTP {} - Response: {}\nQuery URL: {}", status, body, visit_url));
+  }
+
+  let visit_rows: Vec<WfVisitSync> = visit_response
     .json()
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("[wf_visits] JSON parse error: {}", e))?;
+
   for row in &visit_rows {
-    let affected = sqlx::query(
-      "INSERT INTO wf_visits \
-          (sync_id, machine_id, hn, visit_date, inr_value, inr_source, current_dose_mgday, \
-           dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
-           dose_changed, next_appointment, next_inr_due, physician, notes, side_effects, adherence, \
-           created_by, reviewed_at, reviewed_by, created_at, updated_at, deleted_at, synced_at) \
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(sync_id) DO UPDATE SET \
-          machine_id = excluded.machine_id, \
-          hn = excluded.hn, \
-          visit_date = excluded.visit_date, \
-          inr_value = excluded.inr_value, \
-          inr_source = excluded.inr_source, \
-          current_dose_mgday = excluded.current_dose_mgday, \
-          dose_detail = excluded.dose_detail, \
-          new_dose_mgday = excluded.new_dose_mgday, \
-          new_dose_detail = excluded.new_dose_detail, \
-          new_dose_description = excluded.new_dose_description, \
-          selected_dose_option = excluded.selected_dose_option, \
-          dose_changed = excluded.dose_changed, \
-          next_appointment = excluded.next_appointment, \
-          next_inr_due = excluded.next_inr_due, \
-          physician = excluded.physician, \
-          notes = excluded.notes, \
-          side_effects = excluded.side_effects, \
-          adherence = excluded.adherence, \
-          created_by = excluded.created_by, \
-          reviewed_at = excluded.reviewed_at, \
-          reviewed_by = excluded.reviewed_by, \
-          updated_at = excluded.updated_at, \
-          deleted_at = excluded.deleted_at, \
-          synced_at = excluded.synced_at \
-       WHERE excluded.updated_at > wf_visits.updated_at",
+    let sync_id = row.sync_id.as_ref().ok_or("[wf_visits] sync_id is null")?;
+
+    let existing: Option<String> = sqlx::query_scalar(
+      "SELECT updated_at FROM wf_visits WHERE sync_id = ?"
     )
-    .bind(&row.sync_id)
-    .bind(&row.machine_id)
-    .bind(&row.hn)
-    .bind(&row.visit_date)
-    .bind(row.inr_value)
-    .bind(&row.inr_source)
-    .bind(row.current_dose_mgday)
-    .bind(&row.dose_detail)
-    .bind(row.new_dose_mgday)
-    .bind(&row.new_dose_detail)
-    .bind(&row.new_dose_description)
-    .bind(&row.selected_dose_option)
-    .bind(row.dose_changed)
-    .bind(&row.next_appointment)
-    .bind(&row.next_inr_due)
-    .bind(&row.physician)
-    .bind(&row.notes)
-    .bind(&row.side_effects)
-    .bind(&row.adherence)
-    .bind(&row.created_by)
-    .bind(&row.reviewed_at)
-    .bind(&row.reviewed_by)
-    .bind(&row.created_at)
-    .bind(&row.updated_at)
-    .bind(&row.deleted_at)
-    .bind(&row.updated_at)
-    .execute(&state.pool)
+    .bind(sync_id)
+    .fetch_optional(&state.pool)
     .await
-    .map_err(|e| e.to_string())?
-    .rows_affected();
+    .map_err(|e| e.to_string())?;
+
+    let affected = if let Some(existing_updated) = existing {
+      let should_update = row.updated_at > existing_updated;
+      if should_update {
+        sqlx::query(
+          "UPDATE wf_visits SET machine_id = ?, hn = ?, visit_date = ?, inr_value = ?, inr_source = ?, \
+           current_dose_mgday = ?, dose_detail = ?, new_dose_mgday = ?, new_dose_detail = ?, \
+           new_dose_description = ?, selected_dose_option = ?, dose_changed = ?, next_appointment = ?, \
+           next_inr_due = ?, physician = ?, notes = ?, side_effects = ?, adherence = ?, created_by = ?, \
+           reviewed_at = ?, reviewed_by = ?, updated_at = ?, deleted_at = ?, synced_at = ? \
+           WHERE sync_id = ?"
+        )
+        .bind(&row.machine_id)
+        .bind(&row.hn)
+        .bind(&row.visit_date)
+        .bind(row.inr_value)
+        .bind(&row.inr_source)
+        .bind(row.current_dose_mgday)
+        .bind(&row.dose_detail)
+        .bind(row.new_dose_mgday)
+        .bind(&row.new_dose_detail)
+        .bind(&row.new_dose_description)
+        .bind(&row.selected_dose_option)
+        .bind(row.dose_changed)
+        .bind(&row.next_appointment)
+        .bind(&row.next_inr_due)
+        .bind(&row.physician)
+        .bind(&row.notes)
+        .bind(&row.side_effects)
+        .bind(&row.adherence)
+        .bind(&row.created_by)
+        .bind(&row.reviewed_at)
+        .bind(&row.reviewed_by)
+        .bind(&row.updated_at)
+        .bind(&row.deleted_at)
+        .bind(&row.updated_at)
+        .bind(sync_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected()
+      } else {
+        0
+      }
+    } else {
+      sqlx::query(
+        "INSERT INTO wf_visits \
+            (sync_id, machine_id, hn, visit_date, inr_value, inr_source, current_dose_mgday, \
+             dose_detail, new_dose_mgday, new_dose_detail, new_dose_description, selected_dose_option, \
+             dose_changed, next_appointment, next_inr_due, physician, notes, side_effects, adherence, \
+             created_by, reviewed_at, reviewed_by, created_at, updated_at, deleted_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(sync_id)
+      .bind(&row.machine_id)
+      .bind(&row.hn)
+      .bind(&row.visit_date)
+      .bind(row.inr_value)
+      .bind(&row.inr_source)
+      .bind(row.current_dose_mgday)
+      .bind(&row.dose_detail)
+      .bind(row.new_dose_mgday)
+      .bind(&row.new_dose_detail)
+      .bind(&row.new_dose_description)
+      .bind(&row.selected_dose_option)
+      .bind(row.dose_changed)
+      .bind(&row.next_appointment)
+      .bind(&row.next_inr_due)
+      .bind(&row.physician)
+      .bind(&row.notes)
+      .bind(&row.side_effects)
+      .bind(&row.adherence)
+      .bind(&row.created_by)
+      .bind(&row.reviewed_at)
+      .bind(&row.reviewed_by)
+      .bind(&row.created_at)
+      .bind(&row.updated_at)
+      .bind(&row.deleted_at)
+      .bind(&row.updated_at)
+      .execute(&state.pool)
+      .await
+      .map_err(|e| e.to_string())?
+      .rows_affected()
+    };
+
     if affected > 0 {
       result.pulled += 1;
     } else {
@@ -603,54 +681,89 @@ pub async fn pull_from_supabase(
     "wf_dose_history",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let dose_rows: Vec<WfDoseHistorySync> = with_auth(client.get(dose_url), &anon_key, &machine_id)
+  let dose_response = with_auth(client.get(dose_url.clone()), &anon_key, &machine_id)
     .send()
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("[wf_dose_history] Network error: {}", e))?;
+
+  if !dose_response.status().is_success() {
+    let status = dose_response.status();
+    let body = dose_response.text().await.unwrap_or_default();
+    return Err(format!("[wf_dose_history] HTTP {} - Response: {}\nQuery URL: {}", status, body, dose_url));
+  }
+
+  let dose_rows: Vec<WfDoseHistorySync> = dose_response
     .json()
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("[wf_dose_history] JSON parse error: {}", e))?;
   for row in &dose_rows {
-    let affected = sqlx::query(
-      "INSERT INTO wf_dose_history \
-          (sync_id, machine_id, hn, changed_at, old_dose_mgday, new_dose_mgday, old_detail, \
-           new_detail, reason, inr_at_change, changed_by, created_at, updated_at, deleted_at, synced_at) \
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(sync_id) DO UPDATE SET \
-          machine_id = excluded.machine_id, \
-          hn = excluded.hn, \
-          changed_at = excluded.changed_at, \
-          old_dose_mgday = excluded.old_dose_mgday, \
-          new_dose_mgday = excluded.new_dose_mgday, \
-          old_detail = excluded.old_detail, \
-          new_detail = excluded.new_detail, \
-          reason = excluded.reason, \
-          inr_at_change = excluded.inr_at_change, \
-          changed_by = excluded.changed_by, \
-          updated_at = excluded.updated_at, \
-          deleted_at = excluded.deleted_at, \
-          synced_at = excluded.synced_at \
-       WHERE excluded.updated_at > wf_dose_history.updated_at",
+    let sync_id = row.sync_id.as_ref().ok_or("[wf_dose_history] sync_id is null")?;
+
+    let existing: Option<String> = sqlx::query_scalar(
+      "SELECT updated_at FROM wf_dose_history WHERE sync_id = ?"
     )
-    .bind(&row.sync_id)
-    .bind(&row.machine_id)
-    .bind(&row.hn)
-    .bind(&row.changed_at)
-    .bind(row.old_dose_mgday)
-    .bind(row.new_dose_mgday)
-    .bind(&row.old_detail)
-    .bind(&row.new_detail)
-    .bind(&row.reason)
-    .bind(row.inr_at_change)
-    .bind(&row.changed_by)
-    .bind(&row.created_at)
-    .bind(&row.updated_at)
-    .bind(&row.deleted_at)
-    .bind(&row.updated_at)
-    .execute(&state.pool)
+    .bind(sync_id)
+    .fetch_optional(&state.pool)
     .await
-    .map_err(|e| e.to_string())?
-    .rows_affected();
+    .map_err(|e| e.to_string())?;
+
+    let affected = if let Some(existing_updated) = existing {
+      let should_update = row.updated_at > existing_updated;
+      if should_update {
+        sqlx::query(
+          "UPDATE wf_dose_history SET machine_id = ?, hn = ?, changed_at = ?, old_dose_mgday = ?, \
+           new_dose_mgday = ?, old_detail = ?, new_detail = ?, reason = ?, inr_at_change = ?, \
+           changed_by = ?, updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+        )
+        .bind(&row.machine_id)
+        .bind(&row.hn)
+        .bind(&row.changed_at)
+        .bind(row.old_dose_mgday)
+        .bind(row.new_dose_mgday)
+        .bind(&row.old_detail)
+        .bind(&row.new_detail)
+        .bind(&row.reason)
+        .bind(row.inr_at_change)
+        .bind(&row.changed_by)
+        .bind(&row.updated_at)
+        .bind(&row.deleted_at)
+        .bind(&row.updated_at)
+        .bind(sync_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected()
+      } else {
+        0
+      }
+    } else {
+      sqlx::query(
+        "INSERT INTO wf_dose_history \
+            (sync_id, machine_id, hn, changed_at, old_dose_mgday, new_dose_mgday, old_detail, \
+             new_detail, reason, inr_at_change, changed_by, created_at, updated_at, deleted_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(sync_id)
+      .bind(&row.machine_id)
+      .bind(&row.hn)
+      .bind(&row.changed_at)
+      .bind(row.old_dose_mgday)
+      .bind(row.new_dose_mgday)
+      .bind(&row.old_detail)
+      .bind(&row.new_detail)
+      .bind(&row.reason)
+      .bind(row.inr_at_change)
+      .bind(&row.changed_by)
+      .bind(&row.created_at)
+      .bind(&row.updated_at)
+      .bind(&row.deleted_at)
+      .bind(&row.updated_at)
+      .execute(&state.pool)
+      .await
+      .map_err(|e| e.to_string())?
+      .rows_affected()
+    };
+
     if affected > 0 {
       result.pulled += 1;
     } else {
@@ -663,51 +776,85 @@ pub async fn pull_from_supabase(
     "wf_appointments",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let appointment_rows: Vec<WfAppointmentSync> =
-    with_auth(client.get(appointment_url), &anon_key, &machine_id)
-      .send()
+  let appointment_response = with_auth(client.get(appointment_url.clone()), &anon_key, &machine_id)
+    .send()
+    .await
+    .map_err(|e| format!("[wf_appointments] Network error: {}", e))?;
+
+  if !appointment_response.status().is_success() {
+    let status = appointment_response.status();
+    let body = appointment_response.text().await.unwrap_or_default();
+    return Err(format!("[wf_appointments] HTTP {} - Response: {}\nQuery URL: {}", status, body, appointment_url));
+  }
+
+  let appointment_rows: Vec<WfAppointmentSync> = appointment_response
+    .json()
+    .await
+    .map_err(|e| format!("[wf_appointments] JSON parse error: {}", e))?;
+  for row in &appointment_rows {
+    let sync_id = row.sync_id.as_ref().ok_or("[wf_appointments] sync_id is null")?;
+
+    let existing: Option<String> = sqlx::query_scalar(
+      "SELECT updated_at FROM wf_appointments WHERE sync_id = ?"
+    )
+    .bind(sync_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let affected = if let Some(existing_updated) = existing {
+      let should_update = row.updated_at > existing_updated;
+      if should_update {
+        sqlx::query(
+          "UPDATE wf_appointments SET machine_id = ?, hn = ?, appt_date = ?, appt_type = ?, \
+           status = ?, notes = ?, source_visit_id = ?, generated_from_visit = ?, \
+           updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+        )
+        .bind(&row.machine_id)
+        .bind(&row.hn)
+        .bind(&row.appt_date)
+        .bind(&row.appt_type)
+        .bind(&row.status)
+        .bind(&row.notes)
+        .bind(row.source_visit_id)
+        .bind(row.generated_from_visit)
+        .bind(&row.updated_at)
+        .bind(&row.deleted_at)
+        .bind(&row.updated_at)
+        .bind(sync_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected()
+      } else {
+        0
+      }
+    } else {
+      sqlx::query(
+        "INSERT INTO wf_appointments \
+            (sync_id, machine_id, hn, appt_date, appt_type, status, notes, source_visit_id, \
+             generated_from_visit, created_at, updated_at, deleted_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(sync_id)
+      .bind(&row.machine_id)
+      .bind(&row.hn)
+      .bind(&row.appt_date)
+      .bind(&row.appt_type)
+      .bind(&row.status)
+      .bind(&row.notes)
+      .bind(row.source_visit_id)
+      .bind(row.generated_from_visit)
+      .bind(&row.created_at)
+      .bind(&row.updated_at)
+      .bind(&row.deleted_at)
+      .bind(&row.updated_at)
+      .execute(&state.pool)
       .await
       .map_err(|e| e.to_string())?
-      .json()
-      .await
-      .map_err(|e| e.to_string())?;
-  for row in &appointment_rows {
-    let affected = sqlx::query(
-      "INSERT INTO wf_appointments \
-          (sync_id, machine_id, hn, appt_date, appt_type, status, notes, source_visit_id, \
-           generated_from_visit, created_at, updated_at, deleted_at, synced_at) \
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(sync_id) DO UPDATE SET \
-          machine_id = excluded.machine_id, \
-          hn = excluded.hn, \
-          appt_date = excluded.appt_date, \
-          appt_type = excluded.appt_type, \
-          status = excluded.status, \
-          notes = excluded.notes, \
-          source_visit_id = excluded.source_visit_id, \
-          generated_from_visit = excluded.generated_from_visit, \
-          updated_at = excluded.updated_at, \
-          deleted_at = excluded.deleted_at, \
-          synced_at = excluded.synced_at \
-       WHERE excluded.updated_at > wf_appointments.updated_at",
-    )
-    .bind(&row.sync_id)
-    .bind(&row.machine_id)
-    .bind(&row.hn)
-    .bind(&row.appt_date)
-    .bind(&row.appt_type)
-    .bind(&row.status)
-    .bind(&row.notes)
-    .bind(row.source_visit_id)
-    .bind(row.generated_from_visit)
-    .bind(&row.created_at)
-    .bind(&row.updated_at)
-    .bind(&row.deleted_at)
-    .bind(&row.updated_at)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .rows_affected();
+      .rows_affected()
+    };
+
     if affected > 0 {
       result.pulled += 1;
     } else {
@@ -720,50 +867,85 @@ pub async fn pull_from_supabase(
     "wf_outcomes",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let outcome_rows: Vec<WfOutcomeSync> = with_auth(client.get(outcome_url), &anon_key, &machine_id)
+  let outcome_response = with_auth(client.get(outcome_url.clone()), &anon_key, &machine_id)
     .send()
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("[wf_outcomes] Network error: {}", e))?;
+
+  if !outcome_response.status().is_success() {
+    let status = outcome_response.status();
+    let body = outcome_response.text().await.unwrap_or_default();
+    return Err(format!("[wf_outcomes] HTTP {} - Response: {}\nQuery URL: {}", status, body, outcome_url));
+  }
+
+  let outcome_rows: Vec<WfOutcomeSync> = outcome_response
     .json()
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| format!("[wf_outcomes] JSON parse error: {}", e))?;
   for row in &outcome_rows {
-    let affected = sqlx::query(
-      "INSERT INTO wf_outcomes \
-          (sync_id, machine_id, hn, event_date, event_type, description, inr_at_event, action_taken, \
-           created_by, created_at, updated_at, deleted_at, synced_at) \
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(sync_id) DO UPDATE SET \
-          machine_id = excluded.machine_id, \
-          hn = excluded.hn, \
-          event_date = excluded.event_date, \
-          event_type = excluded.event_type, \
-          description = excluded.description, \
-          inr_at_event = excluded.inr_at_event, \
-          action_taken = excluded.action_taken, \
-          created_by = excluded.created_by, \
-          updated_at = excluded.updated_at, \
-          deleted_at = excluded.deleted_at, \
-          synced_at = excluded.synced_at \
-       WHERE excluded.updated_at > wf_outcomes.updated_at",
+    let sync_id = row.sync_id.as_ref().ok_or("[wf_outcomes] sync_id is null")?;
+
+    let existing: Option<String> = sqlx::query_scalar(
+      "SELECT updated_at FROM wf_outcomes WHERE sync_id = ?"
     )
-    .bind(&row.sync_id)
-    .bind(&row.machine_id)
-    .bind(&row.hn)
-    .bind(&row.event_date)
-    .bind(&row.event_type)
-    .bind(&row.description)
-    .bind(row.inr_at_event)
-    .bind(&row.action_taken)
-    .bind(&row.created_by)
-    .bind(&row.created_at)
-    .bind(&row.updated_at)
-    .bind(&row.deleted_at)
-    .bind(&row.updated_at)
-    .execute(&state.pool)
+    .bind(sync_id)
+    .fetch_optional(&state.pool)
     .await
-    .map_err(|e| e.to_string())?
-    .rows_affected();
+    .map_err(|e| e.to_string())?;
+
+    let affected = if let Some(existing_updated) = existing {
+      let should_update = row.updated_at > existing_updated;
+      if should_update {
+        sqlx::query(
+          "UPDATE wf_outcomes SET machine_id = ?, hn = ?, event_date = ?, event_type = ?, \
+           description = ?, inr_at_event = ?, action_taken = ?, created_by = ?, \
+           updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+        )
+        .bind(&row.machine_id)
+        .bind(&row.hn)
+        .bind(&row.event_date)
+        .bind(&row.event_type)
+        .bind(&row.description)
+        .bind(row.inr_at_event)
+        .bind(&row.action_taken)
+        .bind(&row.created_by)
+        .bind(&row.updated_at)
+        .bind(&row.deleted_at)
+        .bind(&row.updated_at)
+        .bind(sync_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected()
+      } else {
+        0
+      }
+    } else {
+      sqlx::query(
+        "INSERT INTO wf_outcomes \
+            (sync_id, machine_id, hn, event_date, event_type, description, inr_at_event, action_taken, \
+             created_by, created_at, updated_at, deleted_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(sync_id)
+      .bind(&row.machine_id)
+      .bind(&row.hn)
+      .bind(&row.event_date)
+      .bind(&row.event_type)
+      .bind(&row.description)
+      .bind(row.inr_at_event)
+      .bind(&row.action_taken)
+      .bind(&row.created_by)
+      .bind(&row.created_at)
+      .bind(&row.updated_at)
+      .bind(&row.deleted_at)
+      .bind(&row.updated_at)
+      .execute(&state.pool)
+      .await
+      .map_err(|e| e.to_string())?
+      .rows_affected()
+    };
+
     if affected > 0 {
       result.pulled += 1;
     } else {
@@ -776,44 +958,77 @@ pub async fn pull_from_supabase(
     "wf_patient_status_history",
     &[("updated_at", format!("gt.{last_pull_at}"))],
   )?;
-  let history_rows: Vec<WfPatientStatusHistorySync> =
-    with_auth(client.get(history_url), &anon_key, &machine_id)
-      .send()
+  let history_response = with_auth(client.get(history_url.clone()), &anon_key, &machine_id)
+    .send()
+    .await
+    .map_err(|e| format!("[wf_patient_status_history] Network error: {}", e))?;
+
+  if !history_response.status().is_success() {
+    let status = history_response.status();
+    let body = history_response.text().await.unwrap_or_default();
+    return Err(format!("[wf_patient_status_history] HTTP {} - Response: {}\nQuery URL: {}", status, body, history_url));
+  }
+
+  let history_rows: Vec<WfPatientStatusHistorySync> = history_response
+    .json()
+    .await
+    .map_err(|e| format!("[wf_patient_status_history] JSON parse error: {}", e))?;
+  for row in &history_rows {
+    let sync_id = row.sync_id.as_ref().ok_or("[wf_patient_status_history] sync_id is null")?;
+
+    let existing: Option<String> = sqlx::query_scalar(
+      "SELECT updated_at FROM wf_patient_status_history WHERE sync_id = ?"
+    )
+    .bind(sync_id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let affected = if let Some(existing_updated) = existing {
+      let should_update = row.updated_at > existing_updated;
+      if should_update {
+        sqlx::query(
+          "UPDATE wf_patient_status_history SET machine_id = ?, hn = ?, status = ?, reason = ?, \
+           effective_date = ?, updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+        )
+        .bind(&row.machine_id)
+        .bind(&row.hn)
+        .bind(&row.status)
+        .bind(&row.reason)
+        .bind(&row.effective_date)
+        .bind(&row.updated_at)
+        .bind(&row.deleted_at)
+        .bind(&row.updated_at)
+        .bind(sync_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .rows_affected()
+      } else {
+        0
+      }
+    } else {
+      sqlx::query(
+        "INSERT INTO wf_patient_status_history \
+            (sync_id, machine_id, hn, status, reason, effective_date, created_at, updated_at, deleted_at, synced_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      )
+      .bind(sync_id)
+      .bind(&row.machine_id)
+      .bind(&row.hn)
+      .bind(&row.status)
+      .bind(&row.reason)
+      .bind(&row.effective_date)
+      .bind(&row.created_at)
+      .bind(&row.updated_at)
+      .bind(&row.deleted_at)
+      .bind(&row.updated_at)
+      .execute(&state.pool)
       .await
       .map_err(|e| e.to_string())?
-      .json()
-      .await
-      .map_err(|e| e.to_string())?;
-  for row in &history_rows {
-    let affected = sqlx::query(
-      "INSERT INTO wf_patient_status_history \
-          (sync_id, machine_id, hn, status, reason, effective_date, created_at, updated_at, deleted_at, synced_at) \
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
-       ON CONFLICT(sync_id) DO UPDATE SET \
-          machine_id = excluded.machine_id, \
-          hn = excluded.hn, \
-          status = excluded.status, \
-          reason = excluded.reason, \
-          effective_date = excluded.effective_date, \
-          updated_at = excluded.updated_at, \
-          deleted_at = excluded.deleted_at, \
-          synced_at = excluded.synced_at \
-       WHERE excluded.updated_at > wf_patient_status_history.updated_at",
-    )
-    .bind(&row.sync_id)
-    .bind(&row.machine_id)
-    .bind(&row.hn)
-    .bind(&row.status)
-    .bind(&row.reason)
-    .bind(&row.effective_date)
-    .bind(&row.created_at)
-    .bind(&row.updated_at)
-    .bind(&row.deleted_at)
-    .bind(&row.updated_at)
-    .execute(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .rows_affected();
+      .rows_affected()
+    };
+
     if affected > 0 {
       result.pulled += 1;
     } else {
