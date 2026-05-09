@@ -70,10 +70,11 @@ const allowHalf = ref(true)
 const specialDayPattern = ref<'fri-sun' | 'mon-wed-fri'>('fri-sun')
 
 const sideEffectOptionsHigh = [
-  { key: 'bleeding_gums', label: 'เหงือกเลือดออก' },
-  { key: 'bruising', label: 'เลือดออกใต้ผิว' },
-  { key: 'blood_urine', label: 'เลือดออกในปัสสาวะ' },
-  { key: 'blood_stool', label: 'เลือดออกในอุจจาระ' },
+  { key: 'body_bleeding', label: 'เลือดออกตามร่างกาย' },
+  { key: 'blood_urine', label: 'เลือดปนออกมาในปัสสาวะ' },
+  { key: 'bleeding_gums', label: 'เลือดออกตามไรฟัน' },
+  { key: 'hemoptysis', label: 'ไอเป็นเลือด' },
+  { key: 'hematoma', label: 'ห้อเลือด' },
 ]
 const sideEffectOptionsLow = [
   { key: 'nausea', label: 'คลื่นไส้' },

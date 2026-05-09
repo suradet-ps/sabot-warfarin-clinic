@@ -161,10 +161,11 @@ function ttrClass(v: number | null): string {
 }
 
 const sideEffectOptionsHigh: Record<string, string> = {
-  bleeding_gums: 'เหงือกเลือดออก',
-  bruising: 'เลือดออกใต้ผิว',
-  blood_urine: 'เลือดออกในปัสสาวะ',
-  blood_stool: 'เลือดออกในอุจจาระ',
+  body_bleeding: 'เลือดออกตามร่างกาย',
+  blood_urine: 'เลือดปนออกมาในปัสสาวะ',
+  bleeding_gums: 'เลือดออกตามไรฟัน',
+  hemoptysis: 'ไอเป็นเลือด',
+  hematoma: 'ห้อเลือด',
 }
 const sideEffectOptionsLow: Record<string, string> = {
   nausea: 'คลื่นไส้',
