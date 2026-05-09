@@ -184,10 +184,7 @@ where
     .await
     .unwrap_or_else(|_| "unknown error".to_string());
 
-  Err(format!(
-    "[{}] HTTP {} - Response: {}",
-    table, status, body
-  ))
+  Err(format!("[{}] HTTP {} - Response: {}", table, status, body))
 }
 
 #[tauri::command]
@@ -470,24 +467,31 @@ pub async fn pull_from_supabase(
   if !patient_response.status().is_success() {
     let status = patient_response.status();
     let body = patient_response.text().await.unwrap_or_default();
-    return Err(format!("[wf_patients] HTTP {} - Response: {}\nQuery URL: {}", status, body, patient_url));
+    return Err(format!(
+      "[wf_patients] HTTP {} - Response: {}\nQuery URL: {}",
+      status, body, patient_url
+    ));
   }
 
-  let patient_rows: Vec<WfPatientSync> = patient_response
-    .json()
-    .await
-    .map_err(|e| format!("[wf_patients] JSON parse error: {} - Response may be empty or malformed", e))?;
+  let patient_rows: Vec<WfPatientSync> = patient_response.json().await.map_err(|e| {
+    format!(
+      "[wf_patients] JSON parse error: {} - Response may be empty or malformed",
+      e
+    )
+  })?;
 
   for row in &patient_rows {
-    let sync_id = row.sync_id.as_ref().ok_or("[wf_patients] sync_id is null")?;
+    let sync_id = row
+      .sync_id
+      .as_ref()
+      .ok_or("[wf_patients] sync_id is null")?;
 
-    let existing: Option<String> = sqlx::query_scalar(
-      "SELECT updated_at FROM wf_patients WHERE sync_id = ?"
-    )
-    .bind(sync_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing: Option<String> =
+      sqlx::query_scalar("SELECT updated_at FROM wf_patients WHERE sync_id = ?")
+        .bind(sync_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let affected = if let Some(existing_updated) = existing {
       let should_update = row.updated_at > existing_updated;
@@ -496,7 +500,7 @@ pub async fn pull_from_supabase(
           "UPDATE wf_patients SET machine_id = ?, hn = ?, enrolled_at = ?, enrolled_by = ?, \
            status = ?, indication = ?, target_inr_low = ?, target_inr_high = ?, notes = ?, \
            created_at = ?, updated_at = ?, deleted_at = ?, synced_at = ? \
-           WHERE sync_id = ?"
+           WHERE sync_id = ?",
         )
         .bind(&row.machine_id)
         .bind(&row.hn)
@@ -566,7 +570,10 @@ pub async fn pull_from_supabase(
   if !visit_response.status().is_success() {
     let status = visit_response.status();
     let body = visit_response.text().await.unwrap_or_default();
-    return Err(format!("[wf_visits] HTTP {} - Response: {}\nQuery URL: {}", status, body, visit_url));
+    return Err(format!(
+      "[wf_visits] HTTP {} - Response: {}\nQuery URL: {}",
+      status, body, visit_url
+    ));
   }
 
   let visit_rows: Vec<WfVisitSync> = visit_response
@@ -577,13 +584,12 @@ pub async fn pull_from_supabase(
   for row in &visit_rows {
     let sync_id = row.sync_id.as_ref().ok_or("[wf_visits] sync_id is null")?;
 
-    let existing: Option<String> = sqlx::query_scalar(
-      "SELECT updated_at FROM wf_visits WHERE sync_id = ?"
-    )
-    .bind(sync_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing: Option<String> =
+      sqlx::query_scalar("SELECT updated_at FROM wf_visits WHERE sync_id = ?")
+        .bind(sync_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let affected = if let Some(existing_updated) = existing {
       let should_update = row.updated_at > existing_updated;
@@ -689,7 +695,10 @@ pub async fn pull_from_supabase(
   if !dose_response.status().is_success() {
     let status = dose_response.status();
     let body = dose_response.text().await.unwrap_or_default();
-    return Err(format!("[wf_dose_history] HTTP {} - Response: {}\nQuery URL: {}", status, body, dose_url));
+    return Err(format!(
+      "[wf_dose_history] HTTP {} - Response: {}\nQuery URL: {}",
+      status, body, dose_url
+    ));
   }
 
   let dose_rows: Vec<WfDoseHistorySync> = dose_response
@@ -697,15 +706,17 @@ pub async fn pull_from_supabase(
     .await
     .map_err(|e| format!("[wf_dose_history] JSON parse error: {}", e))?;
   for row in &dose_rows {
-    let sync_id = row.sync_id.as_ref().ok_or("[wf_dose_history] sync_id is null")?;
+    let sync_id = row
+      .sync_id
+      .as_ref()
+      .ok_or("[wf_dose_history] sync_id is null")?;
 
-    let existing: Option<String> = sqlx::query_scalar(
-      "SELECT updated_at FROM wf_dose_history WHERE sync_id = ?"
-    )
-    .bind(sync_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing: Option<String> =
+      sqlx::query_scalar("SELECT updated_at FROM wf_dose_history WHERE sync_id = ?")
+        .bind(sync_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let affected = if let Some(existing_updated) = existing {
       let should_update = row.updated_at > existing_updated;
@@ -713,7 +724,7 @@ pub async fn pull_from_supabase(
         sqlx::query(
           "UPDATE wf_dose_history SET machine_id = ?, hn = ?, changed_at = ?, old_dose_mgday = ?, \
            new_dose_mgday = ?, old_detail = ?, new_detail = ?, reason = ?, inr_at_change = ?, \
-           changed_by = ?, updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+           changed_by = ?, updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?",
         )
         .bind(&row.machine_id)
         .bind(&row.hn)
@@ -784,7 +795,10 @@ pub async fn pull_from_supabase(
   if !appointment_response.status().is_success() {
     let status = appointment_response.status();
     let body = appointment_response.text().await.unwrap_or_default();
-    return Err(format!("[wf_appointments] HTTP {} - Response: {}\nQuery URL: {}", status, body, appointment_url));
+    return Err(format!(
+      "[wf_appointments] HTTP {} - Response: {}\nQuery URL: {}",
+      status, body, appointment_url
+    ));
   }
 
   let appointment_rows: Vec<WfAppointmentSync> = appointment_response
@@ -792,15 +806,17 @@ pub async fn pull_from_supabase(
     .await
     .map_err(|e| format!("[wf_appointments] JSON parse error: {}", e))?;
   for row in &appointment_rows {
-    let sync_id = row.sync_id.as_ref().ok_or("[wf_appointments] sync_id is null")?;
+    let sync_id = row
+      .sync_id
+      .as_ref()
+      .ok_or("[wf_appointments] sync_id is null")?;
 
-    let existing: Option<String> = sqlx::query_scalar(
-      "SELECT updated_at FROM wf_appointments WHERE sync_id = ?"
-    )
-    .bind(sync_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing: Option<String> =
+      sqlx::query_scalar("SELECT updated_at FROM wf_appointments WHERE sync_id = ?")
+        .bind(sync_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let affected = if let Some(existing_updated) = existing {
       let should_update = row.updated_at > existing_updated;
@@ -808,7 +824,7 @@ pub async fn pull_from_supabase(
         sqlx::query(
           "UPDATE wf_appointments SET machine_id = ?, hn = ?, appt_date = ?, appt_type = ?, \
            status = ?, notes = ?, source_visit_id = ?, generated_from_visit = ?, \
-           updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+           updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?",
         )
         .bind(&row.machine_id)
         .bind(&row.hn)
@@ -834,7 +850,7 @@ pub async fn pull_from_supabase(
         "INSERT INTO wf_appointments \
             (sync_id, machine_id, hn, appt_date, appt_type, status, notes, source_visit_id, \
              generated_from_visit, created_at, updated_at, deleted_at, synced_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       )
       .bind(sync_id)
       .bind(&row.machine_id)
@@ -875,7 +891,10 @@ pub async fn pull_from_supabase(
   if !outcome_response.status().is_success() {
     let status = outcome_response.status();
     let body = outcome_response.text().await.unwrap_or_default();
-    return Err(format!("[wf_outcomes] HTTP {} - Response: {}\nQuery URL: {}", status, body, outcome_url));
+    return Err(format!(
+      "[wf_outcomes] HTTP {} - Response: {}\nQuery URL: {}",
+      status, body, outcome_url
+    ));
   }
 
   let outcome_rows: Vec<WfOutcomeSync> = outcome_response
@@ -883,15 +902,17 @@ pub async fn pull_from_supabase(
     .await
     .map_err(|e| format!("[wf_outcomes] JSON parse error: {}", e))?;
   for row in &outcome_rows {
-    let sync_id = row.sync_id.as_ref().ok_or("[wf_outcomes] sync_id is null")?;
+    let sync_id = row
+      .sync_id
+      .as_ref()
+      .ok_or("[wf_outcomes] sync_id is null")?;
 
-    let existing: Option<String> = sqlx::query_scalar(
-      "SELECT updated_at FROM wf_outcomes WHERE sync_id = ?"
-    )
-    .bind(sync_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing: Option<String> =
+      sqlx::query_scalar("SELECT updated_at FROM wf_outcomes WHERE sync_id = ?")
+        .bind(sync_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let affected = if let Some(existing_updated) = existing {
       let should_update = row.updated_at > existing_updated;
@@ -899,7 +920,7 @@ pub async fn pull_from_supabase(
         sqlx::query(
           "UPDATE wf_outcomes SET machine_id = ?, hn = ?, event_date = ?, event_type = ?, \
            description = ?, inr_at_event = ?, action_taken = ?, created_by = ?, \
-           updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+           updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?",
         )
         .bind(&row.machine_id)
         .bind(&row.hn)
@@ -966,7 +987,10 @@ pub async fn pull_from_supabase(
   if !history_response.status().is_success() {
     let status = history_response.status();
     let body = history_response.text().await.unwrap_or_default();
-    return Err(format!("[wf_patient_status_history] HTTP {} - Response: {}\nQuery URL: {}", status, body, history_url));
+    return Err(format!(
+      "[wf_patient_status_history] HTTP {} - Response: {}\nQuery URL: {}",
+      status, body, history_url
+    ));
   }
 
   let history_rows: Vec<WfPatientStatusHistorySync> = history_response
@@ -974,22 +998,24 @@ pub async fn pull_from_supabase(
     .await
     .map_err(|e| format!("[wf_patient_status_history] JSON parse error: {}", e))?;
   for row in &history_rows {
-    let sync_id = row.sync_id.as_ref().ok_or("[wf_patient_status_history] sync_id is null")?;
+    let sync_id = row
+      .sync_id
+      .as_ref()
+      .ok_or("[wf_patient_status_history] sync_id is null")?;
 
-    let existing: Option<String> = sqlx::query_scalar(
-      "SELECT updated_at FROM wf_patient_status_history WHERE sync_id = ?"
-    )
-    .bind(sync_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let existing: Option<String> =
+      sqlx::query_scalar("SELECT updated_at FROM wf_patient_status_history WHERE sync_id = ?")
+        .bind(sync_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let affected = if let Some(existing_updated) = existing {
       let should_update = row.updated_at > existing_updated;
       if should_update {
         sqlx::query(
           "UPDATE wf_patient_status_history SET machine_id = ?, hn = ?, status = ?, reason = ?, \
-           effective_date = ?, updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?"
+           effective_date = ?, updated_at = ?, deleted_at = ?, synced_at = ? WHERE sync_id = ?",
         )
         .bind(&row.machine_id)
         .bind(&row.hn)
