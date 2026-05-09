@@ -22,13 +22,13 @@ const emit = defineEmits<{
 const dayNames = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.']
 
 const dayHeaderColors = [
-  'bg-yellow-tint',
-  'bg-pink-tint',
-  'bg-pink-tint',
-  'bg-orange-tint',
-  'bg-blue-tint',
-  'bg-pink-tint',
-  'bg-coral-tint',
+  'bg-day-mon',
+  'bg-day-tue',
+  'bg-day-wed',
+  'bg-day-thu',
+  'bg-day-fri',
+  'bg-day-sat',
+  'bg-day-sun',
 ]
 
 const headerLabel = computed(() => props.label || 'วิธีกินยา')

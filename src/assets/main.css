@@ -175,9 +175,11 @@ select.input { cursor: pointer; }
   outline-offset: 2px;
 }
 
-/* ---- Color Tints for RegimenOptionCard day headers ---- */
-.bg-yellow-tint { background: var(--color-yellow-100); color: var(--color-yellow-500); }
-.bg-pink-tint { background: var(--color-pink-100); color: var(--color-pink-600); }
-.bg-orange-tint { background: var(--color-coral-100); color: var(--color-coral-500); }
-.bg-blue-tint { background: #DBEAFE; color: #1D4ED8; }
-.bg-coral-tint { background: var(--color-coral-100); color: var(--color-coral-500); }
+/* ---- 7-Day Color Scale for RegimenOptionCard day headers ---- */
+.bg-day-mon { background: var(--color-yellow-100); color: var(--color-yellow-500); }
+.bg-day-tue { background: var(--color-pink-100); color: var(--color-pink-600); }
+.bg-day-wed { background: #DCFCE7; color: #166534; }
+.bg-day-thu { background: var(--color-coral-100); color: var(--color-coral-500); }
+.bg-day-fri { background: #DBEAFE; color: #1E40AF; }
+.bg-day-sat { background: #F3E8FF; color: #7E22CE; }
+.bg-day-sun { background: #FEE2E2; color: #991B1B; }
