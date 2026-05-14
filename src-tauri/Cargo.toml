@@ -1,6 +1,6 @@
 [package]
 name = "sabot-warfarin-clinic"
-version = "2.0.0"
+version = "2.0.1"
 description = "Warfarin Clinic Management System — Sabot Hospital"
 authors = ["Suradet Pratomsak"]
 edition = "2024"
