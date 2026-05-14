@@ -872,7 +872,7 @@ async fn unlink_or_delete_visit_appointment(
   if generated_from_visit != 0 {
     sqlx::query(
       "UPDATE wf_appointments \
-          SET deleted_at = ?, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
+          SET deleted_at = ?, source_visit_id = NULL, updated_at = ?, machine_id = ?, sync_id = COALESCE(sync_id, ?) \
         WHERE id = ? AND deleted_at IS NULL",
     )
     .bind(now)

@@ -20,7 +20,10 @@ use commands::{
   },
   reports::{calculate_clinic_ttr, calculate_ttr, get_report_data},
   screening::search_warfarin_patients,
-  settings::{get_mysql_config_for_ui, get_mysql_config_internal, get_setting_value, get_settings, save_setting, test_mysql_connection},
+  settings::{
+    get_mysql_config_for_ui, get_mysql_config_internal, get_setting_value, get_settings,
+    save_setting, test_mysql_connection,
+  },
   slip::save_slip_pdf,
   sync::{
     get_sync_status, get_sync_summary, pull_from_supabase, push_to_supabase, save_supabase_config,
