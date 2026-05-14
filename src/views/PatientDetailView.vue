@@ -15,6 +15,8 @@ import StatusBadge from '#/components/shared/StatusBadge.vue'
 import VisitFormPanel from '#/components/visit/VisitFormPanel.vue'
 import type { PatientDetail } from '#/types/patient'
 import type { WfVisit } from '#/types/visit'
+import { useAlertStore } from '#/stores/alerts'
+import { useReviewStore } from '#/stores/review'
 import { useSettingsStore } from '#/stores/settings'
 import { calculateAge, formatThaiDate, patientFullName, sexLabel } from '#/utils/clinic'
 
@@ -22,6 +24,8 @@ const route = useRoute()
 const router = useRouter()
 const hn = route.params.hn as string
 const settingsStore = useSettingsStore()
+const alertStore = useAlertStore()
+const reviewStore = useReviewStore()
 
 type TabKey = 'inr' | 'visits' | 'dispensing' | 'interactions' | 'appointments' | 'adverse'
 const activeTab = ref<TabKey>('inr')
@@ -69,6 +73,8 @@ const fullName = computed(() => patientFullName(patientDetail.value?.hosxpInfo))
 async function onVisitSaved(visitId: number) {
   visitPanelOpen.value = false
   editingVisit.value = null
+  void alertStore.fetchAlerts()
+  void reviewStore.fetchPendingCount()
   await router.push(`/slip/${visitId}`)
 }
 
@@ -80,6 +86,8 @@ function handleEditVisit(visit: WfVisit) {
 function handleVisitUpdated() {
   visitPanelOpen.value = false
   editingVisit.value = null
+  void alertStore.fetchAlerts()
+  void reviewStore.fetchPendingCount()
   void refreshVisits()
   void loadPatient()
 }
@@ -88,6 +96,12 @@ async function refreshVisits() {
   const visitList = await invoke<WfVisit[]>('get_visit_history', { hn })
   visits.value = visitList
   appointmentTimelineKey.value += 1
+}
+
+function handleVisitDeleted() {
+  void alertStore.fetchAlerts()
+  void reviewStore.fetchPendingCount()
+  void refreshVisits()
 }
 
 onMounted(() => { void loadPatient() })
@@ -172,7 +186,7 @@ onMounted(() => { void loadPatient() })
           />
         </template>
 
-        <VisitList v-else-if="activeTab === 'visits'" :visits="visits" :hn="hn" @deleted="refreshVisits" @edit="handleEditVisit" />
+        <VisitList v-else-if="activeTab === 'visits'" :visits="visits" :hn="hn" @deleted="handleVisitDeleted" @edit="handleEditVisit" />
 
         <DispensingTable
           v-else-if="activeTab === 'dispensing'"

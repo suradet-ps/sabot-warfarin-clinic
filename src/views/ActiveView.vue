@@ -6,9 +6,11 @@ import { AlertTriangle, Search, Users } from 'lucide-vue-next'
 import PatientRow from '#/components/active/PatientRow.vue'
 import VisitFormPanel from '#/components/visit/VisitFormPanel.vue'
 import { useAlertStore } from '#/stores/alerts'
+import { useReviewStore } from '#/stores/review'
 import type { ActivePatientSummary } from '#/types/patient'
 
 const alertStore = useAlertStore()
+const reviewStore = useReviewStore()
 const router = useRouter()
 const visitPanelOpen = ref(false)
 const selectedHn = ref<string>('')
@@ -53,6 +55,7 @@ function openVisit(hn: string) {
 
 async function handleSaved(visitId: number) {
   visitPanelOpen.value = false
+  void reviewStore.fetchPendingCount()
   await loadRows()
   await router.push(`/slip/${visitId}`)
 }
