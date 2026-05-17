@@ -19,7 +19,7 @@ tauri-plugin-store = "2"
 aes-gcm = "0.10"
 hkdf = "0.13"
 rand = "0.10"
-sha2 = "0.10"
+sha2 = "0.11"
 base64 = "0.22"
 sqlx = { version = "0.8", features = ["mysql", "sqlite", "runtime-tokio", "chrono", "macros"] }
 tokio = { version = "1", features = ["full"] }
