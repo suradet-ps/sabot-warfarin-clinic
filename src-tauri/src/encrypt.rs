@@ -4,7 +4,7 @@ use aes_gcm::{
 };
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use hkdf::Hkdf;
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
@@ -21,7 +21,7 @@ pub struct EncryptedData {
 
 pub fn generate_key() -> [u8; KEY_SIZE] {
   let mut key = [0u8; KEY_SIZE];
-  rand::thread_rng().fill_bytes(&mut key);
+  rand::rng().fill_bytes(&mut key);
   key
 }
 
@@ -37,7 +37,7 @@ pub fn encrypt(plaintext: &str, key: &[u8; KEY_SIZE]) -> Result<EncryptedData, S
   let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| e.to_string())?;
 
   let mut nonce_bytes = [0u8; NONCE_SIZE];
-  rand::thread_rng().fill_bytes(&mut nonce_bytes);
+  rand::rng().fill_bytes(&mut nonce_bytes);
   let nonce = Nonce::from_slice(&nonce_bytes);
 
   let ciphertext = cipher
@@ -75,7 +75,7 @@ pub fn encrypt_value(plaintext: &str, machine_id: &str) -> Result<String, String
   let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| e.to_string())?;
 
   let mut nonce_bytes = [0u8; NONCE_SIZE];
-  rand::thread_rng().fill_bytes(&mut nonce_bytes);
+  rand::rng().fill_bytes(&mut nonce_bytes);
   let nonce = Nonce::from_slice(&nonce_bytes);
 
   let ciphertext = cipher
